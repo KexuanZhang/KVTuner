@@ -1,17 +1,18 @@
 import torch
-from src.flexible_quantized_cache import FlexibleQuantizedCacheConfig, FlexibleHQQQuantizedCache
+from src.flexible_quantized_cache import FlexibleQuantizedCacheConfig, FlexibleHQQQuantizedCache, FlexibleVanillaQuantizedCache
 from transformers import AutoTokenizer, AutoModelForCausalLM, QuantizedCacheConfig, HQQQuantizedCache, QuantoQuantizedCache
 from datasets import load_dataset
 
 CACHE_DIR = "./models_storage"
-model = AutoModelForCausalLM.from_pretrained("meta-llama/Meta-Llama-3-8B", cache_dir=CACHE_DIR, torch_dtype=torch.float16).cuda()
-tokenizer = AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3-8B", use_fast=False, trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-2-7b-hf", cache_dir=CACHE_DIR, torch_dtype=torch.float16).cuda()
+tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf", use_fast=False, trust_remote_code=True)
 
 # Quanto from huggingface is not working at all
 # ValueError("shift must be specified for qtypes lower than 8-bit")
 
-cache_config = FlexibleQuantizedCacheConfig(nbits_key=8, nbits_value=4, axis_key=0, axis_value=1, device='cuda')
-past_key_values = FlexibleHQQQuantizedCache(cache_config=cache_config) # it seems in HQQ, 0 for per-token and 1 for per-channel
+cache_config = FlexibleQuantizedCacheConfig(nbits_key=4, nbits_value=2, asym=True, axis_key=1, axis_value=0, device='cuda')
+# past_key_values = FlexibleHQQQuantizedCache(cache_config=cache_config) # it seems in HQQ, 0 for per-token and 1 for per-channel
+past_key_values = FlexibleVanillaQuantizedCache(cache_config=cache_config)
 
 # cache_config = QuantizedCacheConfig(nbits=4, axis_key=0, axis_value=0, device='cuda')
 # past_key_values = QuantoQuantizedCache(cache_config=cache_config)
