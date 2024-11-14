@@ -4,13 +4,15 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, QuantizedCacheConf
 from datasets import load_dataset
 
 CACHE_DIR = "./models_storage"
-model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-2-7b-hf", cache_dir=CACHE_DIR, torch_dtype=torch.float16).cuda()
-tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf", use_fast=False, trust_remote_code=True)
+# model_name = 'Qwen/Qwen2.5-3B-Instruct-AWQ'
+model_name = 'Qwen/Qwen2.5-7B-Instruct'
+model = AutoModelForCausalLM.from_pretrained(model_name, cache_dir=CACHE_DIR, torch_dtype=torch.float16).cuda()
+tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False, trust_remote_code=True)
 
 # Quanto from huggingface is not working at all
 # ValueError("shift must be specified for qtypes lower than 8-bit")
 
-cache_config = FlexibleQuantizedCacheConfig(nbits_key=4, nbits_value=2, asym=True, axis_key=1, axis_value=0, device='cuda')
+cache_config = FlexibleQuantizedCacheConfig(nbits_key=4, nbits_value=4, asym=True, axis_key=1, axis_value=0, device='cuda')
 # past_key_values = FlexibleHQQQuantizedCache(cache_config=cache_config) # it seems in HQQ, 0 for per-token and 1 for per-channel
 past_key_values = FlexibleVanillaQuantizedCache(cache_config=cache_config)
 
@@ -26,7 +28,7 @@ prompt += "Question: John takes care of 10 dogs. Each dog takes .5 hours a day t
 inputs = tokenizer(prompt, return_tensors="pt").input_ids.cuda()
 print('======')
 
-outputs = model.generate(inputs, past_key_values=past_key_values, use_cache=True, max_new_tokens=96)
+outputs = model.generate(inputs, past_key_values=past_key_values, use_cache=True, max_new_tokens=256)
 
 # config_str = f"# prompt tokens: {inputs.shape[1]}, K bit: {config.k_bits}, v_bits: {config.v_bits}, group_size: {config.group_size}, residual_length: {config.residual_length}"
 config_str = f"# prompt tokens: {inputs.shape[1]}"

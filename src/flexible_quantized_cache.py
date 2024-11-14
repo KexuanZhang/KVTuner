@@ -273,6 +273,7 @@ class FlexibleHQQQuantizedCache(FlexibleQuantizedCache):
             compute_dtype=self.compute_dtype,
             nbits=nbits,
             group_size=self.q_group_size,
+            channel_wise=True,
         )
         meta["compute_dtype"] = self.compute_dtype
         self.quantizer.cuda(qtensor, meta=meta, device=self.device)  # Move to device and cast to dtype
