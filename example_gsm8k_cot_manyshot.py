@@ -5,7 +5,7 @@ import torch
 import random
 import argparse
 import torch
-from src.flexible_quantized_cache import FlexibleQuantizedCacheConfig, FlexibleHQQQuantizedCache, FlexibleVanillaQuantizedCache
+from flexible_quant.flexible_quantized_cache import FlexibleQuantizedCacheConfig, FlexibleHQQQuantizedCache, FlexibleVanillaQuantizedCache
 from transformers import AutoTokenizer, AutoModelForCausalLM, QuantizedCacheConfig, HQQQuantizedCache, QuantoQuantizedCache
 from datasets import load_dataset
 from transformers import LlamaConfig, AutoTokenizer, LlamaForCausalLM

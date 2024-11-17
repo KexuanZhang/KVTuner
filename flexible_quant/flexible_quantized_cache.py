@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from transformers.cache_utils import DynamicCache, CacheConfig, QuantizedCacheConfig, is_optimum_quanto_available, is_quanto_available
 from transformers.utils import is_hqq_available
 
-from src.vanilla_quantizer import VanillaQuantizer
+from flexible_quant.vanilla_quantizer import VanillaQuantizer
 
 if is_hqq_available():
     from hqq.core.quantize import Quantizer as HQQQuantizer
