@@ -9,6 +9,8 @@ if is_hqq_available():
     from hqq.core.quantize import Quantizer as HQQQuantizer
 
 class FlexibleQuantizedCacheConfig(QuantizedCacheConfig):
+    cache_implementation = "flexible"
+    
     def __init__(
         self,
         backend: str = "quanto",
@@ -22,6 +24,7 @@ class FlexibleQuantizedCacheConfig(QuantizedCacheConfig):
         residual_length: Optional[int] = 128,
         compute_dtype: Optional[torch.dtype] = torch.float16,
         device: Optional[str] = "cpu",
+        force_quant: Optional[bool] = False,
     ):
         super().__init__(
             backend=backend,
@@ -36,6 +39,7 @@ class FlexibleQuantizedCacheConfig(QuantizedCacheConfig):
         self.nbits_key = nbits_key if nbits_key else nbits
         self.nbits_value = nbits_value if nbits_value else nbits
         self.asym = asym
+        self.force_quant = force_quant
 
 
 class FlexibleQuantizedCache(DynamicCache):
@@ -67,6 +71,7 @@ class FlexibleQuantizedCache(DynamicCache):
         self.asym = cache_config.asym
         self.compute_dtype = cache_config.compute_dtype
         self.device = cache_config.device
+        self.force_quant = cache_config.force_quant
 
         super().__init__()
 
@@ -78,17 +83,32 @@ class FlexibleQuantizedCache(DynamicCache):
         cache_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         # Update the number of seen tokens
+        # print('Called Update, {}, {}'.format(self.nbits_key, self.nbits_value))
         if layer_idx == 0:
             self._seen_tokens += key_states.shape[-2]
 
         if len(self.key_cache) < layer_idx:
             raise ValueError("QuantizedCache does not support model usage where layers are skipped. Use DynamicCache.")
         elif len(self.key_cache) == layer_idx:
-            self._quantized_key_cache.append(self._quantize(key_states.contiguous(), axis=self.axis_key, nbits=self.nbits_key))
-            self._quantized_value_cache.append(self._quantize(value_states.contiguous(), axis=self.axis_value, nbits=self.nbits_value))
-            self.key_cache.append(torch.zeros(0, dtype=key_states.dtype, device=key_states.device))
-            self.value_cache.append(torch.zeros(0, dtype=key_states.dtype, device=key_states.device))
-            keys_to_return, values_to_return = key_states, value_states
+            if self.force_quant:
+                # quirk: use dequantized key/value instead of original key/value
+                if self.residual_length:
+                    tokens_to_keep = key_states.shape[-2] % self.residual_length
+                    # keep tokens_to_keep by slicing the cache in axis -2
+                    self._quantized_key_cache.append(self._quantize(key_states[..., :-tokens_to_keep, :], axis=self.axis_key, nbits=self.nbits_key))
+                    self._quantized_value_cache.append(self._quantize(value_states[..., :-tokens_to_keep, :], axis=self.axis_value, nbits=self.nbits_value))
+                    self.key_cache.append(key_states[..., -tokens_to_keep:, :])
+                    self.value_cache.append(value_states[..., -tokens_to_keep:, :])
+                keys_to_return = [self._dequantize(self._quantized_key_cache[layer_idx]), self.key_cache[layer_idx]]
+                values_to_return = [self._dequantize(self._quantized_value_cache[layer_idx]), self.value_cache[layer_idx]]
+                keys_to_return = torch.cat(keys_to_return, dim=-2)
+                values_to_return = torch.cat(values_to_return, dim=-2)
+            else:
+                self._quantized_key_cache.append(self._quantize(key_states.contiguous(), axis=self.axis_key, nbits=self.nbits_key))
+                self._quantized_value_cache.append(self._quantize(value_states.contiguous(), axis=self.axis_value, nbits=self.nbits_value))
+                self.key_cache.append(torch.zeros(0, dtype=key_states.dtype, device=key_states.device))
+                self.value_cache.append(torch.zeros(0, dtype=key_states.dtype, device=key_states.device))
+                keys_to_return, values_to_return = key_states, value_states
         else:
             dequant_key = self._dequantize(self._quantized_key_cache[layer_idx])
             dequant_value = self._dequantize(self._quantized_value_cache[layer_idx])
