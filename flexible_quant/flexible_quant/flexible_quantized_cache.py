@@ -99,6 +99,11 @@ class FlexibleQuantizedCache(DynamicCache):
                     self._quantized_value_cache.append(self._quantize(value_states[..., :-tokens_to_keep, :], axis=self.axis_value, nbits=self.nbits_value))
                     self.key_cache.append(key_states[..., -tokens_to_keep:, :])
                     self.value_cache.append(value_states[..., -tokens_to_keep:, :])
+                else:
+                    self._quantized_key_cache.append(self._quantize(key_states, axis=self.axis_key, nbits=self.nbits_key))
+                    self._quantized_value_cache.append(self._quantize(value_states, axis=self.axis_value, nbits=self.nbits_value))
+                    self.key_cache.append(torch.zeros(0, dtype=key_states.dtype, device=key_states.device))
+                    self.value_cache.append(torch.zeros(0, dtype=key_states.dtype, device=key_states.device))
                 keys_to_return = [self._dequantize(self._quantized_key_cache[layer_idx]), self.key_cache[layer_idx]]
                 values_to_return = [self._dequantize(self._quantized_value_cache[layer_idx]), self.value_cache[layer_idx]]
                 keys_to_return = torch.cat(keys_to_return, dim=-2)
