@@ -4,15 +4,16 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, QuantizedCacheConf
 from datasets import load_dataset
 
 CACHE_DIR = "./models_storage"
-# model_name = 'Qwen/Qwen2.5-3B-Instruct-AWQ'
-model_name = 'Qwen/Qwen2.5-7B-Instruct'
+model_name = 'Qwen/Qwen2.5-3B-Instruct-AWQ'
+# model_name = 'Qwen/Qwen2.5-7B-Instruct'
+# model_name = 'meta-llama/Meta-Llama-3-8B'
 model = AutoModelForCausalLM.from_pretrained(model_name, cache_dir=CACHE_DIR, torch_dtype=torch.float16).cuda()
 tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False, trust_remote_code=True)
 
 # Quanto from huggingface is not working at all
 # ValueError("shift must be specified for qtypes lower than 8-bit")
 
-cache_config = FlexibleQuantizedCacheConfig(nbits_key=4, nbits_value=4, asym=True, axis_key=1, axis_value=0, device='cuda')
+cache_config = FlexibleQuantizedCacheConfig(nbits_key=4, nbits_value=4, asym=True, axis_key=1, axis_value=0, device='cuda', per_head_quant=True, per_head_config_path='config/meta-llama_Meta-Llama-3-8B-Instruct_k8_v4.yaml')
 # past_key_values = FlexibleHQQQuantizedCache(cache_config=cache_config) # it seems in HQQ, 0 for per-token and 1 for per-channel
 past_key_values = FlexibleVanillaQuantizedCache(cache_config=cache_config)
 
