@@ -173,9 +173,9 @@ class FlexibleQuantizedCache(DynamicCache):
                     self.key_cache[layer_idx].dim() == 4
                     and self.key_cache[layer_idx].shape[-2] + 1 >= self.residual_length
                 ):
-                    self._quantized_key_cache[layer_idx] = self._quantize(keys_to_return.contiguous(), axis=self.axis_key, nbits=self.nbits_key)
+                    self._quantized_key_cache[layer_idx] = self._quantize(keys_to_return.contiguous(), axis=self.axis_key, nbits=nbits_key)
                     self._quantized_value_cache[layer_idx] = self._quantize(
-                        values_to_return.contiguous(), axis=self.axis_value, nbits=self.nbits_value
+                        values_to_return.contiguous(), axis=self.axis_value, nbits=nbits_value
                     )
                     self.key_cache[layer_idx] = torch.zeros(0, dtype=key_states.dtype, device=key_states.device)
                     self.value_cache[layer_idx] = torch.zeros(0, dtype=key_states.dtype, device=key_states.device)
