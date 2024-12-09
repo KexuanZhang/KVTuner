@@ -13,6 +13,8 @@ from datasets import load_dataset
 from evals.gsm8k_utils import *
 import tqdm
 import optuna
+import lm_eval
+from lm_eval.models.huggingface_quant import HFLM_Quant
 
 # For reproducibility
 random.seed(0)
@@ -42,28 +44,35 @@ def parse_args(args=None):
 
 
 
-def run_gsm8k(residual_length: int, group_size: int, asym: bool, axis_key: int, axis_value: int, per_layer_config: dict, model: AutoModelForCausalLM, tokenizer: AutoTokenizer, dataset: dict):
-    cache_config = FlexibleQuantizedCacheConfig(residual_length=args.residual_length, q_group_size=args.group_size,
-                                                asym=args.asym, axis_key=args.axis_key, axis_value=args.axis_value, device='cuda', compute_dtype=torch.bfloat16, per_layer_quant=True, per_layer_config=per_layer_config)
-    answers = []
-    
-    for _question_answer in tqdm.tqdm(dataset['test']):
-        past_key_values = FlexibleVanillaQuantizedCache(cache_config=cache_config)
-        prompt = build_prompt_from_trainset(dataset['train'], _question_answer["question"], 4, True)
-        inputs = tokenizer(prompt, return_tensors="pt").input_ids.cuda()
-        output = model.generate(inputs, past_key_values=past_key_values, use_cache=True, max_new_tokens=256)
-        model_completion = tokenizer.decode(output[0].tolist()[inputs.shape[1]:], skip_special_tokens=True)
-        model_answer = clean_answer(model_completion)
-        is_cor = is_correct(model_answer, _question_answer["answer"])
-        answers.append(is_cor)
-    
-    accuracy = float(sum(answers))/len(answers)
-    print(
-            f"Num of total question: {len(answers)}, "
-            f"Correct num: {sum(answers)}, "
-            f"Accuracy: {accuracy}."
-        )
-    return accuracy
+def run_gsm8k(residual_length: int, group_size: int, asym: bool, axis_key: int, axis_value: int, per_layer_config: dict, model_name: str):
+    model = HFLM_Quant(
+        pretrained=model_name,
+        nbits_key=-1,
+        nbits_value=-1,
+        residual_length=residual_length,
+        q_group_size=group_size,
+        asym=asym,
+        axis_key=axis_key,
+        axis_value=axis_value,
+        # device=device,
+        dtype=torch.bfloat16,
+        force_quant=True,
+        per_layer_quant=True,
+        per_layer_config=per_layer_config,
+        quantilizer='vanilla',
+    )
+
+    task_manager = lm_eval.tasks.TaskManager()
+    results = lm_eval.simple_evaluate(
+        model=model,
+        tasks=["gsm8k"],
+        # tasks=["ceval-valid"],
+        num_fewshot=0,
+        task_manager=task_manager,
+        batch_size=8,
+    )
+    print(results)
+    return results['gsm8k']['acc']
 
 def build_per_layer_config(model: str, nbits_key_high: int, nbits_value_high: int, nbits_key_low: int, nbits_value_low: int):
     important_layers = []
@@ -91,7 +100,7 @@ def objective(trial):
     
     per_layer_config, tot_scale = build_per_layer_config(args.model_name, 2 ** nbits_key_high, 2 ** nbits_value_high, 2 ** nbits_key_low, 2 ** nbits_value_low)
     
-    accuracy = run_gsm8k(global_args['residual_length'], global_args['group_size'], global_args['asym'], global_args['axis_key'], global_args['axis_value'], per_layer_config, model, tokenizer, dataset)
+    accuracy = run_gsm8k(global_args['residual_length'], global_args['group_size'], global_args['asym'], global_args['axis_key'], global_args['axis_value'], per_layer_config, global_args['model_name'])
     
     return accuracy, tot_scale
 
@@ -100,17 +109,12 @@ if __name__ == "__main__":
     args = parse_args()
     model_name = args.model_name
     
+    global_args['model_name'] = model_name
     global_args['residual_length'] = args.residual_length
     global_args['group_size'] = args.group_size
     global_args['asym'] = args.asym
     global_args['axis_key'] = args.axis_key
     global_args['axis_value'] = args.axis_value
-        
-    model = AutoModelForCausalLM.from_pretrained(model_name, cache_dir=CACHE_DIR, torch_dtype=torch.bfloat16).cuda()
-    model = model.eval()
-    tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False, trust_remote_code=True)
-
-    dataset = load_dataset('gsm8k', 'main')
     
     study = optuna.create_study(directions=["maximize", "minimize"])
     study.optimize(objective, n_trials=30)
