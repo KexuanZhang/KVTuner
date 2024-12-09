@@ -4,11 +4,8 @@ import torch
 import random
 import argparse
 import torch
-import optuna
 import lm_eval
 from lm_eval.models.huggingface_quant import HFLM_Quant
-import logging
-import sys
 
 # For reproducibility
 random.seed(0)
@@ -45,7 +42,7 @@ def parse_args(args=None):
     # in Vanilla, 0 for per-token, 1 for per-channel, we have to use per-channel there as residual_length is 0
     parser.add_argument('--axis_key', type=int, default=0)
     parser.add_argument('--axis_value', type=int, default=0)
-    parser.add_argument('--limit', type=int, default=20)
+    parser.add_argument('--limit', type=int, default=200)
     parser.add_argument('--num_fewshots', type=int, default=0)
     parser.add_argument('--device', type=str, default="cuda")
     return parser.parse_args(args)
@@ -101,19 +98,6 @@ def build_per_layer_config(model: str, config_high: int, config_medium: int, con
     return per_layer_config, tot_scale
 
 
-def objective(trial):
-    profile_high = trial.suggest_categorical('profile_high', [0, 1, 2, 3, 4])
-    profile_medium = trial.suggest_categorical('profile_medium', [0, 1, 2, 3, 4])
-    profile_low = trial.suggest_categorical('profile_low', [0, 1, 2, 3, 4])
-    
-    per_layer_config, tot_scale = build_per_layer_config(args.model_name, profile_high, profile_medium, profile_low)
-    
-    accuracy = run_gsm8k(global_args['residual_length'], global_args['group_size'], global_args['asym'], global_args['axis_key'], global_args['axis_value'], per_layer_config, 
-                        global_args['model_name'], global_args['num_fewshots'], global_args['limit'], global_args['device'])
-    
-    return accuracy, tot_scale
-
-
 if __name__ == "__main__":
     args = parse_args()
     model_name = args.model_name
@@ -128,17 +112,15 @@ if __name__ == "__main__":
     global_args['num_fewshots'] = args.num_fewshots
     global_args['device'] = args.device
     
-    optuna.logging.get_logger("optuna").addHandler(logging.StreamHandler(sys.stdout))
-    study_name = "{}_gsm8k_l{}_search_{}".format(model_name.replace("/", "_"), args.limit, args.device.replace(":", ""))
-    storage_name = "sqlite:///{}.db".format(study_name)
-    study = optuna.create_study(directions=["maximize", "minimize"], study_name=study_name, storage=storage_name)
-    study.optimize(objective, n_trials=30)
-
-    print(study.best_params)
-    print(study.best_value)
-
+    print(global_args)
+    valid_params = []
+    for profile_high in range(5):
+        for profile_medium in range(profile_high, 5):
+            for profile_low in range(profile_medium, 5):
+                valid_params.append((profile_high, profile_medium, profile_low))
     
-    # test run
-    # per_layer_config, tot_scale = build_per_layer_config(args.model_name, 0, 2, 2)
-    # accuracy = run_gsm8k(args.residual_length, args.group_size, args.asym, args.axis_key, args.axis_value, per_layer_config, args.model_name)
-    # print(accuracy, tot_scale)
+    for profile_high, profile_medium, profile_low in valid_params:
+        per_layer_config, tot_scale = build_per_layer_config(args.model_name, profile_high, profile_medium, profile_low)
+        accuracy = run_gsm8k(global_args['residual_length'], global_args['group_size'], global_args['asym'], global_args['axis_key'], global_args['axis_value'], per_layer_config, global_args['model_name'], global_args['num_fewshots'], global_args['limit'], global_args['device'])
+        print(f"Profile: {profile_high}, {profile_medium}, {profile_low}, Accuracy: {accuracy}, Scale: {tot_scale}")
+        print("")
