@@ -35,6 +35,9 @@ class FlexibleQuantizedCacheConfig(QuantizedCacheConfig):
         compute_dtype: Optional[torch.dtype] = torch.float16,
         device: Optional[str] = "cpu",
         force_quant: Optional[bool] = False,
+        per_layer_quant: Optional[bool] = False,
+        per_layer_config: Optional[Dict[str, Any]] = None,
+        per_layer_config_path: Optional[str] = None,
         per_head_quant: Optional[bool] = False,
         per_head_config: Optional[Dict[str, Any]] = None,
         per_head_config_path: Optional[str] = None,
@@ -53,6 +56,18 @@ class FlexibleQuantizedCacheConfig(QuantizedCacheConfig):
         self.nbits_value = nbits_value if nbits_value else nbits
         self.asym = asym
         self.force_quant = force_quant
+        if per_head_quant and per_layer_quant:
+            raise ValueError("per_layer_quant and per_head_quant cannot be Enabled at the same time.")
+        self.per_layer_quant = per_layer_quant
+        if per_layer_quant:
+            if per_layer_config is not None:
+                self.per_layer_config = per_layer_config
+            elif per_layer_config_path is not None:
+                import yaml
+                with open(per_layer_config_path, 'r') as f:
+                    self.per_layer_config = yaml.safe_load(f)
+            else:
+                raise ValueError("per_layer_quant is set to True but per_layer_config or per_layer_config_path is not provided.")
         self.per_head_quant = per_head_quant
         if per_head_quant:
             if per_head_config is not None:
@@ -95,6 +110,9 @@ class FlexibleQuantizedCache(DynamicCache):
         self.compute_dtype = cache_config.compute_dtype
         self.device = cache_config.device
         self.force_quant = cache_config.force_quant
+        self.per_layer_quant = cache_config.per_layer_quant
+        if self.per_layer_quant:
+            self.per_layer_config = cache_config.per_layer_config
         self.per_head_quant = cache_config.per_head_quant
         if self.per_head_quant:
             self.per_head_config = cache_config.per_head_config
@@ -116,19 +134,21 @@ class FlexibleQuantizedCache(DynamicCache):
             raise ValueError("QuantizedCache does not support model usage where layers are skipped. Use DynamicCache.")
 
         if not self.per_head_quant:
+            nbits_key = self.nbits_key if not self.per_layer_quant else self.per_layer_config[layer_idx]['nbits_key']
+            nbits_value = self.nbits_value if not self.per_layer_quant else self.per_layer_config[layer_idx]['nbits_value']
             if len(self.key_cache) == layer_idx:
                 if self.force_quant:
                     # quirk: use dequantized key/value instead of original key/value
                     if self.residual_length:
                         tokens_to_keep = key_states.shape[-2] % self.residual_length
                         # keep tokens_to_keep by slicing the cache in axis -2
-                        self._quantized_key_cache.append(self._quantize(key_states[..., :-tokens_to_keep, :], axis=self.axis_key, nbits=self.nbits_key))
-                        self._quantized_value_cache.append(self._quantize(value_states[..., :-tokens_to_keep, :], axis=self.axis_value, nbits=self.nbits_value))
+                        self._quantized_key_cache.append(self._quantize(key_states[..., :-tokens_to_keep, :], axis=self.axis_key, nbits=nbits_key))
+                        self._quantized_value_cache.append(self._quantize(value_states[..., :-tokens_to_keep, :], axis=self.axis_value, nbits=nbits_value))
                         self.key_cache.append(key_states[..., -tokens_to_keep:, :])
                         self.value_cache.append(value_states[..., -tokens_to_keep:, :])
                     else:
-                        self._quantized_key_cache.append(self._quantize(key_states, axis=self.axis_key, nbits=self.nbits_key))
-                        self._quantized_value_cache.append(self._quantize(value_states, axis=self.axis_value, nbits=self.nbits_value))
+                        self._quantized_key_cache.append(self._quantize(key_states, axis=self.axis_key, nbits=nbits_key))
+                        self._quantized_value_cache.append(self._quantize(value_states, axis=self.axis_value, nbits=nbits_value))
                         self.key_cache.append(torch.zeros(0, dtype=key_states.dtype, device=key_states.device))
                         self.value_cache.append(torch.zeros(0, dtype=key_states.dtype, device=key_states.device))
                     keys_to_return = [self._dequantize(self._quantized_key_cache[layer_idx]), self.key_cache[layer_idx]]
@@ -136,8 +156,8 @@ class FlexibleQuantizedCache(DynamicCache):
                     keys_to_return = torch.cat(keys_to_return, dim=-2)
                     values_to_return = torch.cat(values_to_return, dim=-2)
                 else:
-                    self._quantized_key_cache.append(self._quantize(key_states.contiguous(), axis=self.axis_key, nbits=self.nbits_key))
-                    self._quantized_value_cache.append(self._quantize(value_states.contiguous(), axis=self.axis_value, nbits=self.nbits_value))
+                    self._quantized_key_cache.append(self._quantize(key_states.contiguous(), axis=self.axis_key, nbits=nbits_key))
+                    self._quantized_value_cache.append(self._quantize(value_states.contiguous(), axis=self.axis_value, nbits=nbits_value))
                     self.key_cache.append(torch.zeros(0, dtype=key_states.dtype, device=key_states.device))
                     self.value_cache.append(torch.zeros(0, dtype=key_states.dtype, device=key_states.device))
                     keys_to_return, values_to_return = key_states, value_states
