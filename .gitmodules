@@ -1,3 +1,6 @@
 [submodule "lm-evaluation-harness-X"]
 	path = lm-evaluation-harness-X
 	url = git@github.com:cmd2001/lm-evaluation-harness-X.git
+[submodule "GAOKAO-Bench"]
+	path = GAOKAO-Bench
+	url = git@github.com:OpenLMLab/GAOKAO-Bench.git
