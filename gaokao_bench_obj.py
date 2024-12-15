@@ -13,7 +13,7 @@ import random
 
 # accelerator = Accelerator()
 # device = accelerator.device
-device='cuda'
+device = None
 
 import importlib
 bench_function = importlib.import_module("GAOKAO-Bench.Bench.bench_function")
@@ -54,6 +54,8 @@ def parse_args(args=None):
     parser.add_argument('--axis_value', type=int, default=0)
     parser.add_argument('--per_layer_quant', type=bool, default=False)
     parser.add_argument('--per_layer_config_path', type=str, default="")
+    parser.add_argument('--limit', type=int, default=-1)
+    parser.add_argument('--device', type=str, default="cuda")
     return parser.parse_args(args)
 
 tests_all = []
@@ -61,7 +63,9 @@ tests_all = []
 if __name__ == "__main__":
     args = parse_args()
     print(args)
-
+    
+    device = torch.device(args.device)
+    
     model = AutoModelForCausalLM.from_pretrained(args.model_name, cache_dir=CACHE_DIR, torch_dtype=get_dtype(args.dtype)).to(device)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=False, trust_remote_code=True)
     
@@ -122,6 +126,8 @@ if __name__ == "__main__":
     print('Running tests')
     results = []
     # for test in tqdm.tqdm(tests):
+    if args.limit != -1:
+        tests_all = tests_all[:args.limit]
     idx, correct = 0, 0
     for test in tqdm.tqdm(tests_all):
         past_key_values = FlexibleVanillaQuantizedCache(cache_config=cache_config) if args.quantizer == 'Vanilla' else FlexibleHQQQuantizedCache(cache_config=cache_config)
@@ -150,7 +156,7 @@ if __name__ == "__main__":
             print('====================')
     
     print(f"Num of total question: {idx}, Correct num: {correct}, Accuracy: {float(correct)/idx}")
-    filename_out = f"GAOKAO-Bench_{args.model_name.replace('/', '_')}_k{args.k_bits}_v{args.v_bits}_r{args.residual_length}_g{args.group_size}.json"
+    filename_out = f"GAOKAO-Bench_{args.model_name.replace('/', '_')}_Q_{args.quantizer}_k{args.k_bits}_v{args.v_bits}_r{args.residual_length}_g{args.group_size}.json"
     with open(filename_out, 'w') as f:
         json.dump(results, f)
     f.close()

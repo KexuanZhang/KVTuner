@@ -50,28 +50,51 @@ def parse_args(args=None):
 
 
 def run_gsm8k(residual_length: int, group_size: int, asym: bool, axis_key: int, axis_value: int, per_layer_config: dict, model_name: str, num_fewshots: int, limit: int, device: str):
-    results = lm_eval.simple_evaluate(
-        model='hf-quant',
-        model_args={
-            'pretrained': model_name,
-            'nbits_key': -1,
-            'nbits_value': -1,
-            'residual_length': residual_length,
-            'q_group_size': group_size,
-            'asym': asym,
-            'axis_key': axis_key,
-            'axis_value': axis_value,
-            'dtype': torch.bfloat16,
-            'force_quant': True,
-            'per_layer_quant': True,
-            'per_layer_config': per_layer_config,
-            'quantilizer': 'vanilla',
-        },
-        tasks=["gsm8k"],
-        num_fewshot=num_fewshots,
-        limit=limit,
-        device=device
-    )
+    if limit != -1:
+        results = lm_eval.simple_evaluate(
+            model='hf-quant',
+            model_args={
+                'pretrained': model_name,
+                'nbits_key': -1,
+                'nbits_value': -1,
+                'residual_length': residual_length,
+                'q_group_size': group_size,
+                'asym': asym,
+                'axis_key': axis_key,
+                'axis_value': axis_value,
+                'dtype': torch.bfloat16,
+                'force_quant': True,
+                'per_layer_quant': True,
+                'per_layer_config': per_layer_config,
+                'quantilizer': 'vanilla',
+            },
+            tasks=["gsm8k"],
+            num_fewshot=num_fewshots,
+            limit=limit,
+            device=device
+        )
+    else:
+        results = lm_eval.simple_evaluate(
+            model='hf-quant',
+            model_args={
+                'pretrained': model_name,
+                'nbits_key': -1,
+                'nbits_value': -1,
+                'residual_length': residual_length,
+                'q_group_size': group_size,
+                'asym': asym,
+                'axis_key': axis_key,
+                'axis_value': axis_value,
+                'dtype': torch.bfloat16,
+                'force_quant': True,
+                'per_layer_quant': True,
+                'per_layer_config': per_layer_config,
+                'quantilizer': 'vanilla',
+            },
+            tasks=["gsm8k"],
+            num_fewshot=num_fewshots,
+            device=device
+        )
     print(results['results']['gsm8k']['exact_match,flexible-extract'])
     return float(results['results']['gsm8k']['exact_match,flexible-extract'])
 
