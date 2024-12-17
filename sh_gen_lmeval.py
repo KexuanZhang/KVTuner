@@ -5,9 +5,12 @@
 # mistralai/Mistral-7B-v0.3,Qwen/Qwen2.5-Math-7B-Instruct
 # Qwen/Qwen2.5-7B-Instruct,Qwen/Qwen2.5-Math-7B-Instruct
 
+# FOR WS-9: meta-llama/Meta-Llama-3-8B-Instruct,mistralai/Mistral-7B-v0.3
+# FOR WS-13: Qwen/Qwen2.5-7B-Instruct,Qwen/Qwen2.5-Math-7B-Instruct,Qwen/Qwen2.5-3B-Instruct-AWQ
+
 # model_args_template = "{},nbits_key={},nbits_value={},residual_length=32,q_group_size=32,axis_key=0,axis_value=1,trust_remote_code=True,dtype=bfloat16,force_quant=True"
 
-model_args_template = "{},nbits_key={},nbits_value={},residual_length=0,q_group_size=32,axis_key=0,axis_value=0,trust_remote_code=True,dtype=bfloat16,force_quant=True,quantilizer=vanilla"
+model_args_template = "{},nbits_key={},nbits_value={},residual_length=0,q_group_size=-1,axis_key=0,axis_value=0,trust_remote_code=True,dtype=bfloat16,force_quant=True,quantilizer=vanilla"
 
 model_args_template_bf16 = "{},trust_remote_code=True,dtype=bfloat16"
 

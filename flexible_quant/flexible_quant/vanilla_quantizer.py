@@ -18,20 +18,21 @@ def dequant_asym(x: torch.tensor, scaling: torch.tensor, zeros: torch.tensor, ta
 
 
 class VanillaQuantizeMeta:
-    def __init__(self, nbits, group_size, axis, asym, compute_dtype):
+    def __init__(self, nbits, asym, compute_dtype):
         self.nbits = nbits
-        self.group_size = group_size
-        self.axis = axis # 1 for per-channel, 0 for per-token
+        # self.group_size = group_size
+        # self.axis = axis # 1 for per-channel, 0 for per-token
         self.asym = asym
         self.compute_dtype = compute_dtype
 
     
 class VanillaQuantizedTensor:
-    def __init__(self, tensor, scaling, zeros, original_shape, meta: VanillaQuantizeMeta):
+    def __init__(self, tensor, scaling, zeros, original_shape, axis, meta: VanillaQuantizeMeta):
         self.tensor = tensor
         self.scaling = scaling
         self.zeros = zeros
         self.original_shape = original_shape
+        self.axis = axis
         self.meta = meta
 
     def dequantize(self):
@@ -40,20 +41,23 @@ class VanillaQuantizedTensor:
         else:
             dequant = dequant_sym(self.tensor, self.scaling, self.meta.compute_dtype)
         dequant = dequant.view(self.original_shape)
-        if self.meta.axis == 1:
+        if self.axis == 1:
             max_dim = len(self.original_shape) - 1
             dequant = dequant.transpose(max_dim - 1, max_dim)
         return dequant
 
 class VanillaQuantizer:
-    def __init__(self, nbits, group_size, axis, asym, compute_dtype):
-        self.meta = VanillaQuantizeMeta(nbits, group_size, axis, asym, compute_dtype)
+    def __init__(self, nbits, asym, compute_dtype):
+        self.meta = VanillaQuantizeMeta(nbits, asym, compute_dtype)
     
-    def quantize(self, tensor):
-        if self.meta.axis == 1:
+    def quantize(self, tensor, q_group_size, axis):
+        if axis == 1:
             max_dim = len(tensor.shape) - 1
             tensor = tensor.transpose(max_dim - 1, max_dim)
-        rs = tensor.reshape(-1, self.meta.group_size)
+        if q_group_size == -1:
+            assert axis == 0 # must be per-token
+            q_group_size = tensor.shape[-1] # take the last dimension
+        rs = tensor.reshape(-1, q_group_size)
         
         q_max, q_min = 2 ** (self.meta.nbits - 1) - 1, -2 ** (self.meta.nbits - 1)
         
@@ -67,4 +71,4 @@ class VanillaQuantizer:
             zeros = None
             quant = quant_sym(rs, scale, self.meta.nbits)
         
-        return VanillaQuantizedTensor(quant, scale, zeros, tensor.shape, self.meta)
+        return VanillaQuantizedTensor(quant, scale, zeros, tensor.shape, axis, self.meta)

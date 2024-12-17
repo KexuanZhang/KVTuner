@@ -422,9 +422,9 @@ class FlexibleVanillaQuantizedCache(FlexibleQuantizedCache):
 
     def _quantize(self, tensor, axis, nbits):
         if (nbits, axis) not in self.quantilizers:
-            self.quantilizers[(nbits, axis)] = VanillaQuantizer(nbits, self.q_group_size, axis, self.asym, self.compute_dtype)
+            self.quantilizers[(nbits, axis)] = VanillaQuantizer(nbits, self.asym, self.compute_dtype)
         quantilizer = self.quantilizers[(nbits, axis)]        
-        return quantilizer.quantize(tensor)
+        return quantilizer.quantize(tensor, self.q_group_size, axis)
     
     def _dequantize(self, qtensor):
         return qtensor.dequantize()
