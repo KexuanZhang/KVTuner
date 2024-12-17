@@ -8,7 +8,7 @@
 command_template_vanliia = 'python3 gaokao_bench_obj.py --device cuda:0 --model_name {0} --k_bits {1} --v_bits {2} --residual_length 0 --group_size 32 --quantizer Vanilla --axis_key 0 --axis_value 0'
 command_template_hqq = 'python3 gaokao_bench_obj.py --device cuda:1 --model_name {0} --k_bits {1} --v_bits {2} --residual_length 32 --group_size 32 --quantizer HQQ --axis_key 0 --axis_value 1'
 
-log_filename = "GAOKAO-Bench_{0}_Q_{1}_k{2}_v{3}.json"
+log_filename = "GAOKAO-Bench_{0}_Q_{1}_k{2}_v{3}.log"
 
 kv_config = [
     [8, 8],

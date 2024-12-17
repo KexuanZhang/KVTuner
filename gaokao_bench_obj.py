@@ -136,7 +136,7 @@ if __name__ == "__main__":
         output = model.generate(inputs, past_key_values=past_key_values, use_cache=True, max_new_tokens=256, pad_token_id=None, eos_token_id=None)
         model_completion = tokenizer.decode(output[0].tolist()[inputs.shape[1]:], skip_special_tokens=True)
         test['model_completion'] = model_completion
-        model_answer = bench_function.extract_choice_answer(model_completion, test['type'])
+        model_answer = bench_function.extract_choice_answer(model_completion, test['type'], len(test['standard_answer']))
         test['model_answer'] = model_answer
         test['is_correct'] = model_answer == test['standard_answer']
         results.append(test)
