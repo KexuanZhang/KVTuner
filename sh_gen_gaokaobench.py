@@ -3,10 +3,13 @@
 # Qwen/Qwen2.5-3B-Instruct-AWQ
 # meta-llama/Meta-Llama-3-8B-Instruct,Qwen/Qwen2.5-7B-Instruct
 # mistralai/Mistral-7B-v0.3,Qwen/Qwen2.5-Math-7B-Instruct
+# mistralai/Mistral-7B-v0.3,Qwen/Qwen2.5-3B-Instruct-AWQ
+
+# only test: meta-llama/Meta-Llama-3-8B-Instruct, Qwen/Qwen2.5-7B-Instruct, mistralai/Mistral-7B-v0.3
 
 
-command_template_vanliia = 'python3 gaokao_bench_obj.py --device cuda:0 --model_name {0} --k_bits {1} --v_bits {2} --residual_length 0 --group_size 32 --quantizer Vanilla --axis_key 0 --axis_value 0'
-command_template_hqq = 'python3 gaokao_bench_obj.py --device cuda:1 --model_name {0} --k_bits {1} --v_bits {2} --residual_length 32 --group_size 32 --quantizer HQQ --axis_key 0 --axis_value 1'
+command_template_vanliia = 'python3 gaokao_bench_obj.py --device cuda:1 --model_name {0} --k_bits {1} --v_bits {2} --residual_length 32 --group_size 32 --quantizer Vanilla --axis_key 1 --axis_value 0'
+command_template_hqq = 'python3 gaokao_bench_obj.py --device cuda:0 --model_name {0} --k_bits {1} --v_bits {2} --residual_length 32 --group_size 32 --quantizer HQQ --axis_key 1 --axis_value 0'
 
 log_filename = "GAOKAO-Bench_{0}_Q_{1}_k{2}_v{3}.log"
 
@@ -35,6 +38,7 @@ out_filename_gpu0 = out_filename.replace('.sh', '_gpu0.sh')
 out_filename_gpu1 = out_filename.replace('.sh', '_gpu1.sh')
 
 with open(out_filename_gpu0, 'w+') as f0, open(out_filename_gpu1, 'w+') as f1:
+    f0, f1 = f1, f0
     # run vanilla on gpu0, hqq on gpu1
     f0.write("export NCCL_IB_DISABLE=1\nexport NCCL_P2P_DISABLE=1\n\n")
     f1.write("export NCCL_IB_DISABLE=1\nexport NCCL_P2P_DISABLE=1\n\n")

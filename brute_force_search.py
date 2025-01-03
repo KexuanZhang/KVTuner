@@ -23,7 +23,8 @@ TEMPLATE_KV_QUANT_CONFIG = [
 LLAMA3_IMPORTANT_LAYERS = [0, 3, 5, 7, 12, 15, 22, 26, 30, 31]
 LLAMA3_MEDIUM_LAYERS = [6, 8, 9, 10, 11, 13, 14, 25, 27, 28, 29]
 
-QWEN_IMPORTANT_LAYERS = [0, 3, 13, 19, 27]
+QWEN_IMPORTANT_LAYERS = [0, 18, 20, 27, 29, 35]
+QWEN_MEDIUM_LAYERS = [3, 4, 5]
 
 global_args = {}
 model = None
@@ -33,18 +34,18 @@ dataset = None
 def parse_args(args=None):
     parser = argparse.ArgumentParser()
     # parser.add_argument('--model_name', type=str, default="meta-llama/Llama-2-7b-hf")
-    # parser.add_argument('--model_name', type=str, default="Qwen/Qwen2.5-3B-Instruct-AWQ")
+    parser.add_argument('--model_name', type=str, default="Qwen/Qwen2.5-3B-Instruct-AWQ")
     # parser.add_argument('--model_name', type=str, default="Qwen/Qwen2.5-7B-Instruct")
-    parser.add_argument('--model_name', type=str, default="meta-llama/Meta-Llama-3-8B-Instruct")
-    parser.add_argument('--residual_length', type=int, default=0)
+    # parser.add_argument('--model_name', type=str, default="meta-llama/Meta-Llama-3-8B-Instruct") 
+    parser.add_argument('--residual_length', type=int, default=32)
     parser.add_argument('--group_size', type=int, default=32)
     parser.add_argument('--asym', type=bool, default=True)
     # in Vanilla, 0 for per-token, 1 for per-channel, we have to use per-channel there as residual_length is 0
-    parser.add_argument('--axis_key', type=int, default=0)
+    parser.add_argument('--axis_key', type=int, default=1)
     parser.add_argument('--axis_value', type=int, default=0)
     parser.add_argument('--limit', type=int, default=200)
     parser.add_argument('--num_fewshots', type=int, default=0)
-    parser.add_argument('--device', type=str, default="cuda")
+    parser.add_argument('--device', type=str, default="cuda:0")
     return parser.parse_args(args)
 
 
@@ -105,10 +106,10 @@ def build_per_layer_config(model: str, config_high: int, config_medium: int, con
         medium_layers = LLAMA3_MEDIUM_LAYERS
     if 'qwen' in model.lower():
         important_layers = QWEN_IMPORTANT_LAYERS
-        medium_layers = []
+        medium_layers = QWEN_MEDIUM_LAYERS
     per_layer_config = {}
     tot_scale = 0
-    tot_layers = 32 if 'llama' in model.lower() else 28
+    tot_layers = 32 if 'llama' in model.lower() else 36
     for layer in range(0, tot_layers):
         if layer in important_layers:
             per_layer_config[layer] = TEMPLATE_KV_QUANT_CONFIG[config_high]

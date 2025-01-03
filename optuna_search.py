@@ -26,7 +26,8 @@ TEMPLATE_KV_QUANT_CONFIG = [
 LLAMA3_IMPORTANT_LAYERS = [0, 3, 5, 7, 12, 15, 22, 26, 30, 31]
 LLAMA3_MEDIUM_LAYERS = [6, 8, 9, 10, 11, 13, 14, 25, 27, 28, 29]
 
-QWEN_IMPORTANT_LAYERS = [0, 3, 13, 19, 27]
+QWEN_IMPORTANT_LAYERS = [0, 18, 20, 27, 29, 35]
+QWEN_MEDIUM_LAYERS = [3, 4, 5]
 
 global_args = {}
 model = None
@@ -39,14 +40,16 @@ def parse_args(args=None):
     # parser.add_argument('--model_name', type=str, default="Qwen/Qwen2.5-3B-Instruct-AWQ")
     # parser.add_argument('--model_name', type=str, default="Qwen/Qwen2.5-7B-Instruct")
     parser.add_argument('--model_name', type=str, default="meta-llama/Meta-Llama-3-8B-Instruct")
-    parser.add_argument('--residual_length', type=int, default=0)
+    parser.add_argument('--residual_length', type=int, default=32)
     parser.add_argument('--group_size', type=int, default=32)
     parser.add_argument('--asym', type=bool, default=True)
     # in Vanilla, 0 for per-token, 1 for per-channel, we have to use per-channel there as residual_length is 0
-    parser.add_argument('--axis_key', type=int, default=0)
+    parser.add_argument('--axis_key', type=int, default=1)
     parser.add_argument('--axis_value', type=int, default=0)
     parser.add_argument('--limit', type=int, default=20)
-    parser.add_argument('--num_fewshots', type=int, default=0)
+    parser.add_argument('--num_fewshots', type=int, default=4)
+    parser.add_argument('--max_per_layer_scale', type=int, default=8)
+    parser.add_argument('--n_trials', type=int, default=100)
     parser.add_argument('--device', type=str, default="cuda")
     return parser.parse_args(args)
 
@@ -85,7 +88,7 @@ def build_per_layer_config(model: str, config_high: int, config_medium: int, con
         medium_layers = LLAMA3_MEDIUM_LAYERS
     if 'qwen' in model.lower():
         important_layers = QWEN_IMPORTANT_LAYERS
-        medium_layers = []
+        medium_layers = QWEN_MEDIUM_LAYERS
     per_layer_config = {}
     tot_scale = 0
     tot_layers = 32 if 'llama' in model.lower() else 28
@@ -108,11 +111,19 @@ def objective(trial):
     
     per_layer_config, tot_scale = build_per_layer_config(args.model_name, profile_high, profile_medium, profile_low)
     
+    # Constraints which are considered feasible if less than or equal to zero.
+    
+    c = tot_scale - global_args['max_per_layer_scale']
+    
+    trial.set_user_attr('constraints', c)
+    
     accuracy = run_gsm8k(global_args['residual_length'], global_args['group_size'], global_args['asym'], global_args['axis_key'], global_args['axis_value'], per_layer_config, 
                         global_args['model_name'], global_args['num_fewshots'], global_args['limit'], global_args['device'])
     
     return accuracy, tot_scale
 
+def constraints(trial):
+    return trial.user_attrs["constraint"]
 
 if __name__ == "__main__":
     args = parse_args()
@@ -127,12 +138,14 @@ if __name__ == "__main__":
     global_args['limit'] = args.limit
     global_args['num_fewshots'] = args.num_fewshots
     global_args['device'] = args.device
+    global_args['max_per_layer_scale'] = args.max_per_layer_scale
     
     optuna.logging.get_logger("optuna").addHandler(logging.StreamHandler(sys.stdout))
-    study_name = "{}_gsm8k_l{}_search_{}".format(model_name.replace("/", "_"), args.limit, args.device.replace(":", ""))
+    study_name = "{}_gsm8k_l{}_search_{}_m{}".format(model_name.replace("/", "_"), args.limit, args.device.replace(":", ""), args.max_per_layer_scale)
     storage_name = "sqlite:///{}.db".format(study_name)
-    study = optuna.create_study(directions=["maximize", "minimize"], study_name=study_name, storage=storage_name)
-    study.optimize(objective, n_trials=30)
+    sampler = optuna.samplers.NSGAIISampler(constraints_func=constraints)
+    study = optuna.create_study(directions=["maximize", "minimize"], study_name=study_name, storage=storage_name, sampler=sampler)
+    study.optimize(objective, n_trials=args.n_trials)
 
     print(study.best_params)
     print(study.best_value)
