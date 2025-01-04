@@ -115,7 +115,7 @@ def objective(trial):
     
     c = tot_scale - global_args['max_per_layer_scale']
     
-    trial.set_user_attr('constraints', c)
+    trial.set_user_attr('constraints', (c))
     
     accuracy = run_gsm8k(global_args['residual_length'], global_args['group_size'], global_args['asym'], global_args['axis_key'], global_args['axis_value'], per_layer_config, 
                         global_args['model_name'], global_args['num_fewshots'], global_args['limit'], global_args['device'])
