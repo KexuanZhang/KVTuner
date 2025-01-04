@@ -123,7 +123,7 @@ def objective(trial):
     return accuracy, tot_scale
 
 def constraints(trial):
-    return trial.user_attrs["constraint"]
+    return trial.user_attrs["constraints"]
 
 if __name__ == "__main__":
     args = parse_args()
