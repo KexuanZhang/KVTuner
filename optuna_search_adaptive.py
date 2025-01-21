@@ -143,7 +143,7 @@ def parse_args(args=None):
     parser.add_argument('--axis_value', type=int, default=0)
     parser.add_argument('--limit', type=int, default=20)
     parser.add_argument('--num_fewshots', type=int, default=4)
-    parser.add_argument('--max_per_layer_scale', type=int, default=8)
+    parser.add_argument('--max_per_layer_scale', type=str, default='8')
     parser.add_argument('--n_trials', type=int, default=100)
     parser.add_argument('--device', type=str, default="cuda")
     return parser.parse_args(args)
@@ -242,7 +242,7 @@ if __name__ == "__main__":
     args = parse_args()
     model = args.model_name
     quant_scheme = args.quant_scheme
-    max_per_layer_scale = args.max_per_layer_scale
+    max_per_layer_scale = float(args.max_per_layer_scale)
     num_fewshots = args.num_fewshots
     limit = args.limit
     device = args.device
