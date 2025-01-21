@@ -82,39 +82,22 @@ def run_gsm8k(residual_length: int, group_size: int, asym: bool, axis_key: int, 
     print(results['results']['gsm8k']['exact_match,flexible-extract'])
     return float(results['results']['gsm8k']['exact_match,flexible-extract'])
 
-def build_per_layer_config(model: str, config_high: int, config_medium: int, config_low: int):
-    important_layers = []
-    if 'llama' in model.lower():
-        important_layers = LLAMA3_IMPORTANT_LAYERS
-        medium_layers = LLAMA3_MEDIUM_LAYERS
-    if 'qwen' in model.lower():
-        important_layers = QWEN_IMPORTANT_LAYERS
-        medium_layers = QWEN_MEDIUM_LAYERS
+def objective(trial):
+    tot_layers = 32 if 'llama' in model.lower() else 36
+    
     per_layer_config = {}
     tot_scale = 0
-    tot_layers = 32 if 'llama' in model.lower() else 36
-    for layer in range(0, tot_layers):
-        if layer in important_layers:
-            per_layer_config[layer] = TEMPLATE_KV_QUANT_CONFIG[config_high]
-        elif layer in medium_layers:
-            per_layer_config[layer] = TEMPLATE_KV_QUANT_CONFIG[config_medium]
-        else:
-            per_layer_config[layer] = TEMPLATE_KV_QUANT_CONFIG[config_low]
-        tot_scale += per_layer_config[layer]['nbits_key'] + per_layer_config[layer]['nbits_value']
-    tot_scale /= tot_layers * 2
-    return per_layer_config, tot_scale
-
-
-def objective(trial):
-    profile_high = trial.suggest_categorical('profile_high', [0, 1, 2, 3, 4])
-    profile_medium = trial.suggest_categorical('profile_medium', [0, 1, 2, 3, 4])
-    profile_low = trial.suggest_categorical('profile_low', [0, 1, 2, 3, 4])
     
-    per_layer_config, tot_scale = build_per_layer_config(args.model_name, profile_high, profile_medium, profile_low)
+    for layer in range(0, tot_layers):
+        config_current_layer = trial.suggest_int('layer_{}'.format(layer), 0, len(TEMPLATE_KV_QUANT_CONFIG) - 1)
+        per_layer_config[layer] = TEMPLATE_KV_QUANT_CONFIG[config_current_layer]
+        tot_scale += per_layer_config[layer]['nbits_key'] + per_layer_config[layer]['nbits_value']
     
     # Constraints which are considered feasible if less than or equal to zero.
-    
+    tot_scale /= tot_layers * 2
     c = tot_scale - global_args['max_per_layer_scale']
+    
+    print('constraints:', c)
     
     trial.set_user_attr('constraints', (c, ))
     
@@ -128,9 +111,9 @@ def constraints(trial):
 
 if __name__ == "__main__":
     args = parse_args()
-    model_name = args.model_name
+    model = args.model_name
     
-    global_args['model_name'] = model_name
+    global_args['model_name'] = args.model_name
     global_args['residual_length'] = args.residual_length
     global_args['group_size'] = args.group_size
     global_args['asym'] = args.asym
@@ -142,7 +125,7 @@ if __name__ == "__main__":
     global_args['max_per_layer_scale'] = args.max_per_layer_scale
     
     optuna.logging.get_logger("optuna").addHandler(logging.StreamHandler(sys.stdout))
-    study_name = "{}_gsm8k_l{}_search_{}_m{}_OPTUNA_{}".format(model_name.replace("/", "_"), args.limit, args.device.replace(":", ""), args.max_per_layer_scale, 'per_token' if args.group_size else 'kivi')
+    study_name = "{}_gsm8k_l{}_search_{}_m{}_brute_force_{}".format(model.replace("/", "_"), args.limit, args.device.replace(":", ""), args.max_per_layer_scale, 'per_token' if args.group_size else 'kivi')
     storage_name = "sqlite:///{}.db".format(study_name)
     sampler = optuna.samplers.NSGAIISampler(constraints_func=constraints)
     study = optuna.create_study(directions=["maximize", "minimize"], study_name=study_name, storage=storage_name, sampler=sampler)
@@ -150,9 +133,3 @@ if __name__ == "__main__":
 
     # print(study.best_params)
     # print(study.best_value)
-
-    
-    # test run
-    # per_layer_config, tot_scale = build_per_layer_config(args.model_name, 0, 2, 2)
-    # accuracy = run_gsm8k(args.residual_length, args.group_size, args.asym, args.axis_key, args.axis_value, per_layer_config, args.model_name)
-    # print(accuracy, tot_scale)
