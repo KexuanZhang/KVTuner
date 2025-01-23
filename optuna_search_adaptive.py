@@ -45,7 +45,7 @@ LAYER_GROUPING_CONFIG = {
 }
 
 SPECIAL_LAYERS = {
-    'Llama3.1-8B-Instruct': {
+    'Meta-Llama3.1-8B-Instruct': {
         'per-token-asym': {
             (0,): ['KV8', 'K4V8', 'KV4', 'K4V2', 'KV2'],
         },
