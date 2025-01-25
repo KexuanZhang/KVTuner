@@ -77,6 +77,8 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--models', type=str, required=True)
 parser.add_argument('--filename', type=str, required=False, default='run.sh')
+parser.add_argument('--baseline_only', type=bool, required=False, default=False)
+parser.add_argument('--kvturner_only', type=bool, required=False, default=False)
 
 args = parser.parse_args()
 
@@ -96,56 +98,59 @@ with open(out_filename, 'w+') as f:
         calibration_files = get_calibration_filepath(model)
         filename_model = model.replace('/', '_') + '_pertoken'
         # first, run bf16
-        f.write(f'# ======== {model} bf16 ========\n')
-        for task_preset in TASKS:
-            for nshot in task_preset['nshots']:
-                filename = get_filename(filename_model, task_preset['filename'], nshot, 'bf16')
-                model_arg = model_args_template_bf16.format(model)
-                if task_preset.get('fewshot_as_multiturn', False):
-                    command = command_fewshot_as_multiturn.format(model_arg, ','.join(task_preset['tasks']), nshot, filename, filename)
-                else:
-                    command = command_fewshot_template.format(model_arg, ','.join(task_preset['tasks']), nshot, filename, filename)
-                command = command.replace('hf-quant', 'hf')
-                f.write(command)
-                tot_commands += 1
-                tot_time += 25 if 'gsm8k' in task_preset['filename'] else 10
-                f.write('\n')
-                f.write('\n')
-        f.write('\n\n\n')
-        # then, run kv configs
-        f.write(f'# ======== {model} kv calibration ========\n')
-        for (calibration_file, calibration_file_id) in calibration_files:
+        if not args.kvturner_only:
+            f.write(f'# ======== {model} bf16 ========\n')
             for task_preset in TASKS:
                 for nshot in task_preset['nshots']:
-                    filename = get_filename(filename_model, task_preset['filename'], nshot, calibration_file_id)
-                    model_arg = model_args_template_pertoken_perlayer.format(model, calibration_file)
+                    filename = get_filename(filename_model, task_preset['filename'], nshot, 'bf16')
+                    model_arg = model_args_template_bf16.format(model)
                     if task_preset.get('fewshot_as_multiturn', False):
                         command = command_fewshot_as_multiturn.format(model_arg, ','.join(task_preset['tasks']), nshot, filename, filename)
                     else:
                         command = command_fewshot_template.format(model_arg, ','.join(task_preset['tasks']), nshot, filename, filename)
+                    command = command.replace('hf-quant', 'hf')
                     f.write(command)
                     tot_commands += 1
                     tot_time += 25 if 'gsm8k' in task_preset['filename'] else 10
                     f.write('\n')
                     f.write('\n')
-        f.write('\n\n\n')
-        # standard kv configs
-        f.write(f'# ======== {model} standard kv configs ========\n')
-        for kv_config in STANDARD_KV_CONFIG:
-            for task_preset in TASKS:
-                for nshot in task_preset['nshots']:
-                    nbits_key, nbits_value = extract_kv_config(kv_config)
-                    filename = get_filename(filename_model, task_preset['filename'], nshot, kv_config)
-                    model_arg = model_args_template_pertoken.format(model, nbits_key, nbits_value)
-                    if task_preset.get('fewshot_as_multiturn', False):
-                        command = command_fewshot_as_multiturn.format(model_arg, ','.join(task_preset['tasks']), nshot, filename, filename)
-                    else:
-                        command = command_fewshot_template.format(model_arg, ','.join(task_preset['tasks']), nshot, filename, filename)
-                    f.write(command)
-                    tot_commands += 1
-                    tot_time += 25 if 'gsm8k' in task_preset['filename'] else 10
-                    f.write('\n')
-                    f.write('\n')
+            f.write('\n\n\n')
+        if not args.baseline_only:
+            # then, run kv configs
+            f.write(f'# ======== {model} kv calibration ========\n')
+            for (calibration_file, calibration_file_id) in calibration_files:
+                for task_preset in TASKS:
+                    for nshot in task_preset['nshots']:
+                        filename = get_filename(filename_model, task_preset['filename'], nshot, calibration_file_id)
+                        model_arg = model_args_template_pertoken_perlayer.format(model, calibration_file)
+                        if task_preset.get('fewshot_as_multiturn', False):
+                            command = command_fewshot_as_multiturn.format(model_arg, ','.join(task_preset['tasks']), nshot, filename, filename)
+                        else:
+                            command = command_fewshot_template.format(model_arg, ','.join(task_preset['tasks']), nshot, filename, filename)
+                        f.write(command)
+                        tot_commands += 1
+                        tot_time += 25 if 'gsm8k' in task_preset['filename'] else 10
+                        f.write('\n')
+                        f.write('\n')
+            f.write('\n\n\n')
+        if not args.kvturner_only:
+            # standard kv configs
+            f.write(f'# ======== {model} standard kv configs ========\n')
+            for kv_config in STANDARD_KV_CONFIG:
+                for task_preset in TASKS:
+                    for nshot in task_preset['nshots']:
+                        nbits_key, nbits_value = extract_kv_config(kv_config)
+                        filename = get_filename(filename_model, task_preset['filename'], nshot, kv_config)
+                        model_arg = model_args_template_pertoken.format(model, nbits_key, nbits_value)
+                        if task_preset.get('fewshot_as_multiturn', False):
+                            command = command_fewshot_as_multiturn.format(model_arg, ','.join(task_preset['tasks']), nshot, filename, filename)
+                        else:
+                            command = command_fewshot_template.format(model_arg, ','.join(task_preset['tasks']), nshot, filename, filename)
+                        f.write(command)
+                        tot_commands += 1
+                        tot_time += 25 if 'gsm8k' in task_preset['filename'] else 10
+                        f.write('\n')
+                        f.write('\n')
 
 import os
 os.system('chmod +x {}'.format(out_filename))

@@ -1,27 +1,27 @@
 0:
-  nbits_key: 4
+  nbits_key: 8
   nbits_value: 8
 1:
   nbits_key: 4
-  nbits_value: 4
+  nbits_value: 2
 2:
   nbits_key: 4
-  nbits_value: 4
+  nbits_value: 2
 3:
   nbits_key: 4
-  nbits_value: 4
+  nbits_value: 2
 4:
   nbits_key: 4
-  nbits_value: 4
+  nbits_value: 2
 5:
-  nbits_key: 4
-  nbits_value: 2
+  nbits_key: 8
+  nbits_value: 4
 6:
-  nbits_key: 4
-  nbits_value: 2
+  nbits_key: 8
+  nbits_value: 4
 7:
   nbits_key: 4
-  nbits_value: 4
+  nbits_value: 2
 8:
   nbits_key: 4
   nbits_value: 4
@@ -35,11 +35,11 @@
   nbits_key: 4
   nbits_value: 4
 12:
-  nbits_key: 4
-  nbits_value: 2
+  nbits_key: 8
+  nbits_value: 4
 13:
   nbits_key: 4
-  nbits_value: 4
+  nbits_value: 2
 14:
   nbits_key: 4
   nbits_value: 4
@@ -54,7 +54,7 @@
   nbits_value: 4
 18:
   nbits_key: 4
-  nbits_value: 4
+  nbits_value: 2
 19:
   nbits_key: 2
   nbits_value: 2
@@ -62,8 +62,8 @@
   nbits_key: 4
   nbits_value: 4
 21:
-  nbits_key: 4
-  nbits_value: 2
+  nbits_key: 8
+  nbits_value: 4
 22:
   nbits_key: 2
   nbits_value: 2
@@ -75,16 +75,16 @@
   nbits_value: 2
 25:
   nbits_key: 4
-  nbits_value: 4
-26:
-  nbits_key: 4
   nbits_value: 2
+26:
+  nbits_key: 8
+  nbits_value: 4
 27:
   nbits_key: 4
-  nbits_value: 4
-28:
-  nbits_key: 4
   nbits_value: 2
+28:
+  nbits_key: 8
+  nbits_value: 4
 29:
   nbits_key: 4
   nbits_value: 2
@@ -93,4 +93,4 @@
   nbits_value: 4
 31:
   nbits_key: 4
-  nbits_value: 4
+  nbits_value: 2
