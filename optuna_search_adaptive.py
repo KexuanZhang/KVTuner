@@ -108,7 +108,7 @@ SPECIAL_LAYERS = {
 
 TOT_LAYER = {
     'Meta-Llama-3.1-8B-Instruct': 32,
-    'Mistral-7B-Instruct-v0.3': 36,
+    'Mistral-7B-Instruct-v0.3': 32,
     'Qwen2.5-3B-Instruct': 36,
     'Qwen2.5-7B-Instruct': 28,
     'Qwen2.5-14B-Instruct': 48,
