@@ -1,0 +1,96 @@
+0:
+  nbits_key: 2
+  nbits_value: 2
+1:
+  nbits_key: 2
+  nbits_value: 2
+2:
+  nbits_key: 4
+  nbits_value: 4
+3:
+  nbits_key: 4
+  nbits_value: 4
+4:
+  nbits_key: 4
+  nbits_value: 4
+5:
+  nbits_key: 8
+  nbits_value: 4
+6:
+  nbits_key: 8
+  nbits_value: 8
+7:
+  nbits_key: 4
+  nbits_value: 4
+8:
+  nbits_key: 4
+  nbits_value: 4
+9:
+  nbits_key: 4
+  nbits_value: 4
+10:
+  nbits_key: 4
+  nbits_value: 4
+11:
+  nbits_key: 8
+  nbits_value: 8
+12:
+  nbits_key: 8
+  nbits_value: 8
+13:
+  nbits_key: 8
+  nbits_value: 8
+14:
+  nbits_key: 4
+  nbits_value: 4
+15:
+  nbits_key: 8
+  nbits_value: 8
+16:
+  nbits_key: 4
+  nbits_value: 4
+17:
+  nbits_key: 8
+  nbits_value: 8
+18:
+  nbits_key: 4
+  nbits_value: 4
+19:
+  nbits_key: 8
+  nbits_value: 8
+20:
+  nbits_key: 8
+  nbits_value: 8
+21:
+  nbits_key: 8
+  nbits_value: 4
+22:
+  nbits_key: 8
+  nbits_value: 4
+23:
+  nbits_key: 8
+  nbits_value: 4
+24:
+  nbits_key: 8
+  nbits_value: 4
+25:
+  nbits_key: 8
+  nbits_value: 4
+26:
+  nbits_key: 8
+  nbits_value: 4
+27:
+  nbits_key: 8
+  nbits_value: 8
+28:
+  nbits_key: 8
+  nbits_value: 4
+29:
+  nbits_key: 8
+  nbits_value: 8
+30:
+  nbits_key: 8
+  nbits_value: 4
+31:
+  nbits_key: 2
+  nbits_value: 2
