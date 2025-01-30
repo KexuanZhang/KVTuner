@@ -46,11 +46,11 @@ TASKS = [
     #     'nshots': [5, 10, 20],
     # },
     # gpqa_extended gets OOM on RTX 4090
-    {
-        'filename': 'gsm8k',
-        'tasks': ['gsm8k'],
-        'nshots': [4, 8, 16],
-    },
+    # {
+    #     'filename': 'gsm8k',
+    #     'tasks': ['gsm8k'],
+    #     'nshots': [4, 8, 16],
+    # },
     {
         'filename': 'gsm8k_multiturn',
         'tasks': ['gsm8k'],
@@ -66,7 +66,7 @@ TASKS = [
 
 STANDARD_KV_CONFIG = ['kv8', 'k8v4', 'k4v8', 'kv4', 'k4v2', 'kv2']
 
-def get_calibration_filepath(model: str):
+def get_calibration_filepath(model: str, quant_scheme: str = 'pertoken'):
     model_name = model.split('/')[-1]
     path = './calibration_presets'
     import os
@@ -75,6 +75,8 @@ def get_calibration_filepath(model: str):
     files = os.listdir(path)
     files = [f for f in files if model_name in f]
     # filename like: modelname_KVTuner{4/6}_{id}.yaml
+    if quant_scheme != 'pertoken':
+        files = [f for f in files if 'pertoken' in f]
     ret = []
     for f in files:
         full_path = os.path.join(path, f)
@@ -116,10 +118,10 @@ tot_time = 0
 with open(out_filename, 'w+') as f:
     f.write("export NCCL_IB_DISABLE=1\nexport NCCL_P2P_DISABLE=1\nexport HF_ALLOW_CODE_EVAL=1\nexport TRANSFORMERS_CACHE=./models_storage\n\n")
     for model in models:
-        calibration_files = get_calibration_filepath(model)
+        calibration_files = get_calibration_filepath(model, quant_scheme)
         filename_model = model.replace('/', '_') + f'_{quant_scheme}'
         # first, run bf16
-        if not args.kvturner_only:
+        if not args.kvturner_only and args.quant_scheme == 'pertoken':
             f.write(f'# ======== {model} bf16 ========\n')
             for task_preset in TASKS:
                 for nshot in task_preset['nshots']:
