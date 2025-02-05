@@ -46,11 +46,11 @@ TASKS = [
     #     'nshots': [5, 10, 20],
     # },
     # gpqa_extended gets OOM on RTX 4090
-    # {
-    #     'filename': 'gsm8k',
-    #     'tasks': ['gsm8k'],
-    #     'nshots': [4, 8, 16],
-    # },
+    {
+        'filename': 'gsm8k',
+        'tasks': ['gsm8k'],
+        'nshots': [4, 8, 16],
+    },
     {
         'filename': 'gsm8k_multiturn',
         'tasks': ['gsm8k'],
@@ -76,7 +76,7 @@ def get_calibration_filepath(model: str, quant_scheme: str = 'pertoken'):
     files = [f for f in files if model_name in f]
     # filename like: modelname_KVTuner{4/6}_{id}.yaml
     if quant_scheme != 'pertoken':
-        files = [f for f in files if 'pertoken' in f]
+        files = [f for f in files if quant_scheme in f]
     ret = []
     for f in files:
         full_path = os.path.join(path, f)
