@@ -182,7 +182,7 @@ def prepare_layer_grouping_config(model_name: str, quant_scheme: str):
                     for other_layer in group:
                         if not other_layer in special_layer:
                             raise ValueError("Special layer {} breaks the layer grouping for model {}, quant scheme {}".format(special_layer, model_name, quant_scheme))
-        group_quant_template = [i for i in group_quant_template if i != 'KV2'] # remove KV2
+        # group_quant_template = [i for i in group_quant_template if i != 'KV2'] # remove KV2
         current_grouping_quant_template.append(group_quant_template)
 
 def run_gsm8k(per_layer_config: dict, model_name: str, num_fewshots: int, limit: int, device: str):
