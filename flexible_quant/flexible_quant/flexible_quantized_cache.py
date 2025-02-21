@@ -19,6 +19,40 @@ per_head_config = {
 '''
 
 class FlexibleQuantizedCacheConfig(QuantizedCacheConfig):
+    """
+    Configuration for flexible quantized cache.
+
+    Attributes:
+        backend (str): Backend for quantization. Options: "quanto", "hqq", "vanilla".
+        nbits (Optional[int]): Precision for both key and value. Used if `nbits_key` and `nbits_value` are not set.
+                               For per-layer or per-head quantization, set `nbits` to -1.
+        nbits_key (Optional[int]): Precision for key quantization. For per-layer or per-head quantization, set to -1.
+        nbits_value (Optional[int]): Precision for value quantization. For per-layer or per-head quantization, set to -1.
+        axis_key (Optional[int]): Axis for key quantization. In Vanilla mode:
+                                  - 0: Per-token quantization
+                                  - 1: Per-channel quantization
+        axis_value (Optional[int]): Axis for value quantization. In Vanilla mode:
+                                    - 0: Per-token quantization
+                                    - 1: Per-channel quantization
+        asym (Optional[bool]): Whether to use asymmetric quantization. Works only for Vanilla mode.
+        q_group_size (Optional[int]): Group size for quantization. Use -1 for per-token quantization.
+        residual_length (Optional[int]): Length of residual tokens that are not quantized.
+                                         Must be a multiple of `q_group_size`. Use 0 for per-token quantization.
+        compute_dtype (Optional[torch.dtype]): Compute dtype for the model. Default: `torch.float16`.
+        device (Optional[str]): Device for the cache. Default: `"cpu"`.
+        force_quant (Optional[bool]): Whether to quantize the cache during the pre-filling stage.
+        per_layer_quant (Optional[bool]): Whether to use per-layer quantization.
+        per_layer_config (Optional[Dict[str, Any]]): If `per_layer_quant` is True, provides the quantization config
+                                                     for each layer. Alternatively, use `per_layer_config_path`.
+        per_layer_config_path (Optional[str]): Path to the quantization config for each layer.
+                                               Used if `per_layer_quant` is True.
+        per_head_quant (Optional[bool]): Whether to use per-head quantization.
+        per_head_config (Optional[Dict[str, Any]]): If `per_head_quant` is True, provides the quantization config
+                                                    for each head. Alternatively, use `per_head_config_path`.
+        per_head_config_path (Optional[str]): Path to the quantization config for each head.
+                                              Used if `per_head_quant` is True.
+    """
+
     cache_implementation = "flexible"
     
     def __init__(

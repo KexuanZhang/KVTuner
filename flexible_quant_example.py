@@ -3,11 +3,11 @@ from flexible_quant.flexible_quantized_cache import FlexibleQuantizedCacheConfig
 from transformers import AutoTokenizer, AutoModelForCausalLM, QuantizedCacheConfig, HQQQuantizedCache, QuantoQuantizedCache
 from datasets import load_dataset
 
-CACHE_DIR = "./models_storage"
+# CACHE_DIR = "./models_storage"
 # model_name = 'Qwen/Qwen2.5-3B-Instruct-AWQ'
 # model_name = 'Qwen/Qwen2.5-7B-Instruct'
 model_name = 'meta-llama/Meta-Llama-3-8B'
-model = AutoModelForCausalLM.from_pretrained(model_name, cache_dir=CACHE_DIR, torch_dtype=torch.float16).cuda()
+model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16).cuda()
 tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False, trust_remote_code=True)
 
 # Quanto from huggingface is not working at all

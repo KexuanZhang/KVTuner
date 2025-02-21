@@ -131,7 +131,7 @@ def get_pred(rank, world_size, data, max_length, max_gen, prompt_format, dataset
         # else:
         input = tokenizer(prompt, truncation=False, return_tensors="pt").to(device)
         context_length = input.input_ids.shape[-1]
-        past_key_values = FlexibleHQQQuantizedCache(cache_config=cache_config)
+        past_key_values = FlexibleVanillaQuantizedCache(cache_config=cache_config)
         if dataset == "samsum": # prevent illegal output on samsum (model endlessly repeat "\nDialogue"), might be a prompting issue
             output = model.generate(
                 **input,

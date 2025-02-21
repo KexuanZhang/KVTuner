@@ -15,7 +15,6 @@ from evals.gsm8k_utils import *
 # For reproducibility
 random.seed(0)
 torch.manual_seed(0)
-CACHE_DIR = "./models_storage"
 
 def parse_args(args=None):
     parser = argparse.ArgumentParser()
@@ -50,7 +49,7 @@ if __name__ == "__main__":
     cache_config = FlexibleQuantizedCacheConfig(nbits_key=args.k_bits, nbits_value=args.v_bits, residual_length=args.residual_length, q_group_size=args.group_size,
                                                 asym=args.asym, axis_key=args.axis_key, axis_value=args.axis_value, device='cuda')
     
-    model = AutoModelForCausalLM.from_pretrained(model_name, cache_dir=CACHE_DIR, torch_dtype=torch.float16).cuda()
+    model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16).cuda()
     tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False, trust_remote_code=True)
 
     dataset = load_dataset('gsm8k', 'main')
@@ -59,7 +58,7 @@ if __name__ == "__main__":
     num_testcases = len(dataset['test'])
     for idx, _question_answer in enumerate(dataset['test']):
         # past_key_values = FlexibleVanillaQuantizedCache(cache_config=cache_config)
-        past_key_values = FlexibleHQQQuantizedCache(cache_config=cache_config)
+        past_key_values = FlexibleVanillaQuantizedCache(cache_config=cache_config)
         
         prompt = build_prompt_from_trainset(dataset['train'], _question_answer["question"], num_cot, COT_FLAG)
 
