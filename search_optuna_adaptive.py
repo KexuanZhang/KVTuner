@@ -133,7 +133,7 @@ current_layer_grouping = []
 current_special_layers = {}
 current_grouping_quant_template = []
 current_tot_layers = -1
-
+debug_constraint = False
 
 def parse_args(args=None):
     parser = argparse.ArgumentParser()
@@ -154,6 +154,7 @@ def parse_args(args=None):
     parser.add_argument('--max_per_layer_scale', type=str, default='8')
     parser.add_argument('--n_trials', type=int, default=100)
     parser.add_argument('--device', type=str, default="cuda")
+    parser.add_argument('--debug_constraint', default=False, action='store_true')
     return parser.parse_args(args)
 
 
@@ -182,7 +183,8 @@ def prepare_layer_grouping_config(model_name: str, quant_scheme: str):
                     for other_layer in group:
                         if not other_layer in special_layer:
                             raise ValueError("Special layer {} breaks the layer grouping for model {}, quant scheme {}".format(special_layer, model_name, quant_scheme))
-        # group_quant_template = [i for i in group_quant_template if i != 'KV2'] # remove KV2
+        if debug_constraint:
+            group_quant_template = [i for i in group_quant_template if i != 'KV2'] # remove KV2
         current_grouping_quant_template.append(group_quant_template)
 
 def run_gsm8k(per_layer_config: dict, model_name: str, num_fewshots: int, limit: int, device: str):
@@ -238,9 +240,17 @@ def objective(trial):
     c = tot_scale - max_per_layer_scale
     print('c = ', c)
     
-    trial.set_user_attr('constraints', (c, ))
+    if not debug_constraint:
+        trial.set_user_attr('constraints', (c, ))
     
     accuracy = run_gsm8k(per_layer_config,  model, num_fewshots, limit, device)
+    
+    c2 = 0.6 - accuracy
+    
+    if debug_constraint:
+        print('c2 = ', c2)
+        trial.set_user_attr('constraints', (c, c2))
+    
     
     return accuracy, tot_scale
 
@@ -255,6 +265,7 @@ if __name__ == "__main__":
     num_fewshots = args.num_fewshots
     limit = args.limit
     device = args.device
+    debug_constraint = args.debug_constraint
     
     
     optuna.logging.get_logger("optuna").addHandler(logging.StreamHandler(sys.stdout))
