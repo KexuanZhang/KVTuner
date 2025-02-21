@@ -1,6 +1,6 @@
 import torch
 from typing import Any, Dict, List, Optional, Tuple
-from transformers.cache_utils import DynamicCache, CacheConfig, QuantizedCacheConfig, is_optimum_quanto_available, is_quanto_available
+from transformers.cache_utils import DynamicCache, CacheConfig, QuantizedCacheConfig, is_optimum_quanto_available
 from transformers.utils import is_hqq_available
 
 from .vanilla_quantizer import VanillaQuantizer
@@ -287,17 +287,17 @@ class FlexibleQuantoQuantizedCache(FlexibleQuantizedCache):
 
         if is_optimum_quanto_available():
             from optimum.quanto import MaxOptimizer, qint2, qint4
-        elif is_quanto_available():
-            logger.warning_once(
-                "Importing from quanto will be deprecated in v4.47. Please install optimum-quanto instead `pip install optimum-quanto`"
-            )
-            quanto_version = version.parse(importlib.metadata.version("quanto"))
-            if quanto_version < version.parse("0.2.0"):
-                raise ImportError(
-                    f"You need quanto package version to be greater or equal than 0.2.0 to use `QuantoQuantizedCache`. Detected version {quanto_version}. "
-                    f"Since quanto will be deprecated, please install optimum-quanto instead with `pip install -U optimum-quanto`"
-                )
-            from quanto import MaxOptimizer, qint2, qint4, qint8
+        # elif is_quanto_available():
+        #     logger.warning_once(
+        #         "Importing from quanto will be deprecated in v4.47. Please install optimum-quanto instead `pip install optimum-quanto`"
+        #     )
+        #     quanto_version = version.parse(importlib.metadata.version("quanto"))
+        #     if quanto_version < version.parse("0.2.0"):
+        #         raise ImportError(
+        #             f"You need quanto package version to be greater or equal than 0.2.0 to use `QuantoQuantizedCache`. Detected version {quanto_version}. "
+        #             f"Since quanto will be deprecated, please install optimum-quanto instead with `pip install -U optimum-quanto`"
+        #         )
+        #     from quanto import MaxOptimizer, qint2, qint4, qint8
 
         if self.nbits not in [2, 4, 8]:
             raise ValueError(f"`nbits` for `quanto` backend has to be one of [`2`, `4`, `8`] but got {self.nbits}")
@@ -316,8 +316,8 @@ class FlexibleQuantoQuantizedCache(FlexibleQuantizedCache):
     def get_qtype(self, nbits):
         if is_optimum_quanto_available():
             from optimum.quanto import qint2, qint4, qint8
-        elif is_quanto_available():
-            from quanto import qint2, qint4, qint8
+        # elif is_quanto_available():
+        #     from quanto import qint2, qint4, qint8
         if nbits == 2:
             return qint2
         elif nbits == 4:
@@ -332,14 +332,14 @@ class FlexibleQuantoQuantizedCache(FlexibleQuantizedCache):
 
             qtensor = quantize_weight(tensor, self.get_qtype(nbits), axis, self.q_group_size)
             return qtensor
-        elif is_quanto_available():
-            logger.warning_once(
-                "Importing from quanto will be deprecated in v4.47. Please install optimum-quanto instead `pip install optimum-quanto`"
-            )
-            from quanto import AffineQuantizer
+        # elif is_quanto_available():
+        #     logger.warning_once(
+        #         "Importing from quanto will be deprecated in v4.47. Please install optimum-quanto instead `pip install optimum-quanto`"
+        #     )
+        #     from quanto import AffineQuantizer
 
-            scale, zeropoint = self.optimizer(tensor, nbits, axis, self.q_group_size)
-            qtensor = AffineQuantizer.apply(tensor, self.get_qtype(nbits), axis, self.q_group_size, scale, zeropoint)
+        #     scale, zeropoint = self.optimizer(tensor, nbits, axis, self.q_group_size)
+        #     qtensor = AffineQuantizer.apply(tensor, self.get_qtype(nbits), axis, self.q_group_size, scale, zeropoint)
 
         return qtensor
 
