@@ -204,11 +204,13 @@ def run_gsm8k(per_layer_config: dict, model_name: str, num_fewshots: int, limit:
             'per_layer_quant': True,
             'per_layer_config': per_layer_config,
             'quantilizer': 'vanilla',
+            'device_map': 'auto',
+            'parallelize': True,
         },
         tasks=["gsm8k"],
         num_fewshot=num_fewshots,
         limit=limit,
-        device=device
+        # device=device
     )
     print(results['results']['gsm8k']['exact_match,flexible-extract'])
     return float(results['results']['gsm8k']['exact_match,flexible-extract'])
