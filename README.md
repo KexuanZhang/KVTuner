@@ -1,5 +1,7 @@
 # KVTuner: Sensitivity-Aware Layer-wise Mixed Precision KV Cache Quantization for Efficient and Nearly Lossless LLM Inference
 
+🎉 KVTuner has been Accepted by ICML 2025.
+
 ## Installation
 ```sh
 cd flexible_quant
