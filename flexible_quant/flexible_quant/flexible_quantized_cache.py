@@ -1,6 +1,7 @@
 import torch
 from typing import Any, Dict, List, Optional, Tuple
-from transformers.cache_utils import DynamicCache, CacheConfig, QuantizedCacheConfig, is_optimum_quanto_available
+# from transformers.cache_utils import DynamicCache, CacheConfig, QuantizedCacheConfig, is_optimum_quanto_available
+from transformers.cache_utils import DynamicCache, QuantizedCacheConfig, is_optimum_quanto_available
 from transformers.utils import is_hqq_available
 
 from .vanilla_quantizer import VanillaQuantizer
@@ -316,7 +317,7 @@ class FlexibleQuantoQuantizedCache(FlexibleQuantizedCache):
         ```
     """
 
-    def __init__(self, cache_config: CacheConfig) -> None:
+    def __init__(self, cache_config: QuantizedCacheConfig) -> None:
         super().__init__(cache_config)
 
         if is_optimum_quanto_available():
@@ -408,7 +409,7 @@ class FlexibleHQQQuantizedCache(FlexibleQuantizedCache):
         ```
     """
 
-    def __init__(self, cache_config: CacheConfig) -> None:
+    def __init__(self, cache_config: QuantizedCacheConfig) -> None:
         super().__init__(cache_config)
         if self.nbits not in [1, 2, 3, 4, 8]:
             raise ValueError(
@@ -443,7 +444,7 @@ class FlexibleHQQQuantizedCache(FlexibleQuantizedCache):
         return tensor
 
 class FlexibleVanillaQuantizedCache(FlexibleQuantizedCache):
-    def __init__(self, cache_config: CacheConfig) -> None:
+    def __init__(self, cache_config: QuantizedCacheConfig) -> None:
         super().__init__(cache_config)
 
         if self.axis_key not in [0, 1]:
