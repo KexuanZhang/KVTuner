@@ -1,7 +1,7 @@
 import torch
 from typing import Any, Dict, List, Optional, Tuple
-# from transformers.cache_utils import DynamicCache, CacheConfig, QuantizedCacheConfig, is_optimum_quanto_available
-from transformers.cache_utils import DynamicCache, QuantizedCacheConfig, is_optimum_quanto_available
+from transformers.cache_utils import DynamicCache, CacheConfig, QuantizedCacheConfig, is_optimum_quanto_available
+# from transformers.cache_utils import DynamicCache, QuantizedCacheConfig, is_optimum_quanto_available
 from transformers.utils import is_hqq_available
 
 from .vanilla_quantizer import VanillaQuantizer
