@@ -521,7 +521,6 @@ if __name__ == "__main__":
     print('Total layers: ', current_tot_layers)
     
     # Store evaluation config in global variables for use in objective function
-    global global_evaluation_mode, global_evaluation_tasks, global_custom_dataset_path
     global_evaluation_mode = evaluation_mode
     global_evaluation_tasks = evaluation_tasks
     global_custom_dataset_path = args.custom_dataset_path
