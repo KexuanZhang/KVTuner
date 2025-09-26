@@ -9,11 +9,88 @@ import lm_eval
 from lm_eval.models.huggingface_quant import HFLM_Quant
 import logging
 import sys
+import json
+import os
+from transformers import AutoConfig
 
 # For reproducibility
 random.seed(0)
 torch.manual_seed(0)
 CACHE_DIR = "./models_storage"
+
+# Global variables for flexible evaluation
+global_evaluation_mode = "single_task"
+global_evaluation_tasks = ["gsm8k"]
+global_custom_dataset_path = None
+
+def get_task_suite(domain: str):
+    """Get task suite for different domains"""
+    task_suites = {
+        'general': ['hellaswag', 'arc_easy', 'winogrande', 'boolq'],
+        'reasoning': ['gsm8k', 'arc_challenge', 'piqa', 'hellaswag'],
+        'knowledge': ['mmlu', 'truthfulqa_mc2', 'arc_challenge'],
+        'code': ['humaneval', 'mbpp'],
+        'reading': ['drop', 'boolq', 'piqa'],
+        'math': ['gsm8k', 'math_qa'],
+        'comprehensive': ['hellaswag', 'arc_challenge', 'gsm8k', 'winogrande', 'boolq', 'piqa']
+    }
+    return task_suites.get(domain, ['gsm8k'])
+
+def get_metric_key(task_name: str):
+    """Get the appropriate metric for different tasks"""
+    task_metrics = {
+        'gsm8k': 'exact_match,flexible-extract',
+        'hellaswag': 'acc_norm',
+        'arc_easy': 'acc',
+        'arc_challenge': 'acc_norm', 
+        'winogrande': 'acc',
+        'boolq': 'acc',
+        'piqa': 'acc_norm',
+        'humaneval': 'pass@1',
+        'mbpp': 'pass@1',
+        'mmlu': 'acc',
+        'truthfulqa_mc2': 'acc',
+        'drop': 'f1',
+        'math_qa': 'acc',
+    }
+    return task_metrics.get(task_name, 'acc')  # Default to 'acc'
+
+def setup_local_model_config(model_path: str, num_layers: int = None):
+    """Automatically configure a local model"""
+    if num_layers is None:
+        try:
+            config = AutoConfig.from_pretrained(model_path)
+            num_layers = config.num_hidden_layers
+            print(f"Auto-detected {num_layers} layers for model: {model_path}")
+        except Exception as e:
+            print(f"Could not auto-detect layers: {e}")
+            print("Please specify --local_model_layers manually")
+            return None
+    
+    model_key = 'local-model'
+    
+    # Add to TOT_LAYER
+    TOT_LAYER[model_key] = num_layers
+    
+    # Create simple layer grouping (each layer in its own group initially)
+    LAYER_GROUPING_CONFIG[model_key] = {
+        'per-token-asym': [[i] for i in range(num_layers)],
+        'per-channel-asym': [[i] for i in range(num_layers)],
+    }
+    
+    # Add conservative special layers (first and last layers get more conservative options)
+    SPECIAL_LAYERS[model_key] = {
+        'per-token-asym': {
+            (0,): ['KV8', 'K8V4', 'K8V2', 'K4V2'],  # Conservative for first layer
+            (num_layers-1,): ['KV8', 'K8V4', 'K8V2', 'K4V2'],  # Conservative for last layer
+        },
+        'per-channel-asym': {
+            (0, num_layers-1): ['KV8', 'K4V8', 'KV4', 'K4V2'],  # Conservative for first and last
+        },
+    }
+    
+    print(f"Configured local model '{model_key}' with {num_layers} layers")
+    return model_key
 
 
 
@@ -155,6 +232,19 @@ def parse_args(args=None):
     parser.add_argument('--n_trials', type=int, default=100)
     parser.add_argument('--device', type=str, default="cuda")
     parser.add_argument('--debug_constraint', default=False, action='store_true')
+    
+    # New evaluation options
+    parser.add_argument('--evaluation_task', type=str, default="gsm8k",
+                       help='Single evaluation task (default: gsm8k)')
+    parser.add_argument('--evaluation_tasks', type=str, nargs='+',
+                       help='Multiple evaluation tasks (overrides --evaluation_task)')
+    parser.add_argument('--domain', type=str, choices=['general', 'reasoning', 'knowledge', 'code', 'reading', 'math', 'comprehensive'],
+                       help='Pre-defined task domain (overrides other task options)')
+    parser.add_argument('--custom_dataset_path', type=str,
+                       help='Path to custom evaluation dataset JSON file')
+    parser.add_argument('--local_model_layers', type=int,
+                       help='Number of layers in local model (auto-detects if not provided)')
+    
     return parser.parse_args(args)
 
 
@@ -216,6 +306,99 @@ def run_gsm8k(per_layer_config: dict, model_name: str, num_fewshots: int, limit:
     return float(results['results']['gsm8k']['exact_match,flexible-extract'])
 
 
+def run_single_task_evaluation(per_layer_config: dict, model_name: str, task_name: str, num_fewshots: int, limit: int, device: str):
+    """Run evaluation on a single task"""
+    results = lm_eval.simple_evaluate(
+        model='hf-quant',
+        model_args={
+            'pretrained': model_name,
+            'nbits_key': -1,
+            'nbits_value': -1,
+            'residual_length': 32 if quant_scheme == 'per-channel-asym' else 0,
+            'q_group_size': 32 if quant_scheme == 'per-channel-asym' else -1,
+            'asym': True,
+            'axis_key': 1 if quant_scheme == 'per-channel-asym' else 0,
+            'axis_value': 0,
+            'dtype': torch.bfloat16,
+            'force_quant': False,
+            'per_layer_quant': True,
+            'per_layer_config': per_layer_config,
+            'quantilizer': 'vanilla',
+            'device_map': 'auto',
+            'parallelize': True,
+        },
+        tasks=[task_name],
+        num_fewshot=num_fewshots,
+        limit=limit,
+    )
+    
+    metric_key = get_metric_key(task_name)
+    score = float(results['results'][task_name][metric_key])
+    print(f"{task_name} {metric_key}: {score}")
+    return score
+
+
+def run_multi_task_evaluation(per_layer_config: dict, model_name: str, tasks: list, num_fewshots: int, limit: int, device: str):
+    """Run evaluation on multiple tasks and return average score"""
+    results = lm_eval.simple_evaluate(
+        model='hf-quant',
+        model_args={
+            'pretrained': model_name,
+            'nbits_key': -1,
+            'nbits_value': -1,
+            'residual_length': 32 if quant_scheme == 'per-channel-asym' else 0,
+            'q_group_size': 32 if quant_scheme == 'per-channel-asym' else -1,
+            'asym': True,
+            'axis_key': 1 if quant_scheme == 'per-channel-asym' else 0,
+            'axis_value': 0,
+            'dtype': torch.bfloat16,
+            'force_quant': False,
+            'per_layer_quant': True,
+            'per_layer_config': per_layer_config,
+            'quantilizer': 'vanilla',
+            'device_map': 'auto',
+            'parallelize': True,
+        },
+        tasks=tasks,
+        num_fewshot=num_fewshots,
+        limit=limit,
+    )
+    
+    # Compute average score across tasks
+    total_score = 0
+    task_scores = {}
+    
+    for task in tasks:
+        metric_key = get_metric_key(task)
+        score = float(results['results'][task][metric_key])
+        task_scores[task] = score
+        total_score += score
+        print(f"{task} {metric_key}: {score}")
+    
+    average_score = total_score / len(tasks)
+    print(f"Average score across {len(tasks)} tasks: {average_score}")
+    return average_score
+
+
+def run_custom_evaluation(per_layer_config: dict, model_name: str, dataset_path: str, limit: int):
+    """Run evaluation on custom dataset (placeholder implementation)"""
+    # This is a simplified implementation - would need full integration with quantization
+    # For now, return a placeholder score
+    print(f"Custom dataset evaluation not fully implemented yet. Using placeholder score.")
+    print(f"Dataset path: {dataset_path}")
+    print(f"Per-layer config: {len(per_layer_config)} layers configured")
+    
+    # Placeholder: return a score based on compression level
+    # More compressed = lower score (simulating quality degradation)
+    total_bits = sum(config.get('nbits_key', 8) + config.get('nbits_value', 8) 
+                    for config in per_layer_config.values())
+    avg_bits = total_bits / (len(per_layer_config) * 2)
+    placeholder_score = max(0.3, min(0.95, 0.95 - (8 - avg_bits) * 0.1))
+    
+    print(f"Custom evaluation placeholder score: {placeholder_score}")
+    return placeholder_score
+
+
 def build_per_layer_config(config_list: int):
     per_layer_config = {}
     tot_scale = 0
@@ -238,14 +421,22 @@ def objective(trial):
     per_layer_config, tot_scale = build_per_layer_config(config_list)
     
     # Constraints which are considered feasible if less than or equal to zero.
-    
     c = tot_scale - max_per_layer_scale
     print('c = ', c)
     
     if not debug_constraint:
         trial.set_user_attr('constraints', (c, ))
     
-    accuracy = run_gsm8k(per_layer_config,  model, num_fewshots, limit, device)
+    # Flexible evaluation based on configuration
+    if global_evaluation_mode == "custom":
+        accuracy = run_custom_evaluation(per_layer_config, model, global_custom_dataset_path, limit)
+    elif global_evaluation_mode == "multi_task":
+        accuracy = run_multi_task_evaluation(per_layer_config, model, global_evaluation_tasks, num_fewshots, limit, device)
+    else:  # single_task
+        if global_evaluation_tasks[0] == "gsm8k":
+            accuracy = run_gsm8k(per_layer_config, model, num_fewshots, limit, device)  # Keep original for GSM8K
+        else:
+            accuracy = run_single_task_evaluation(per_layer_config, model, global_evaluation_tasks[0], num_fewshots, limit, device)
     
     c2 = 0.6 - accuracy
     
@@ -253,7 +444,7 @@ def objective(trial):
         print('c2 = ', c2)
         trial.set_user_attr('constraints', (c, c2))
     
-    
+    print(f"Trial result: accuracy={accuracy:.4f}, tot_scale={tot_scale:.2f}")
     return accuracy, tot_scale
 
 def constraints(trial):
@@ -269,19 +460,70 @@ if __name__ == "__main__":
     device = args.device
     debug_constraint = args.debug_constraint
     
+    # Determine evaluation tasks
+    evaluation_tasks = None
+    evaluation_mode = "single_task"
+    
+    if args.custom_dataset_path:
+        evaluation_mode = "custom"
+        print(f"Using custom dataset: {args.custom_dataset_path}")
+    elif args.domain:
+        evaluation_tasks = get_task_suite(args.domain)
+        evaluation_mode = "multi_task"
+        print(f"Using domain '{args.domain}' tasks: {evaluation_tasks}")
+    elif args.evaluation_tasks:
+        evaluation_tasks = args.evaluation_tasks
+        evaluation_mode = "multi_task" if len(evaluation_tasks) > 1 else "single_task"
+        print(f"Using specified tasks: {evaluation_tasks}")
+    else:
+        evaluation_tasks = [args.evaluation_task]
+        evaluation_mode = "single_task"
+        print(f"Using single task: {args.evaluation_task}")
+    
+    # Setup local model if needed
+    if args.local_model_layers or (not model.startswith(('meta-llama', 'Qwen', 'mistralai'))):
+        print("Setting up local model configuration...")
+        model_key = setup_local_model_config(model, args.local_model_layers)
+        if model_key is None:
+            sys.exit(1)
+    
+    # Create study name based on evaluation mode
+    task_suffix = ""
+    if evaluation_mode == "custom":
+        task_suffix = "CUSTOM"
+    elif evaluation_mode == "multi_task":
+        task_suffix = "_".join(evaluation_tasks[:3])  # Use first 3 tasks in name
+        if len(evaluation_tasks) > 3:
+            task_suffix += f"_PLUS{len(evaluation_tasks)-3}"
+    else:
+        task_suffix = evaluation_tasks[0].upper()
     
     optuna.logging.get_logger("optuna").addHandler(logging.StreamHandler(sys.stdout))
-    study_name = "OPTUNA_SEARCH_ADAPTIVE_{}_GSM8K_FIRST{}_{}SHOTS_MAXSCALE{}_SCHEME{}".format(model.replace("/", "_"), limit, num_fewshots, max_per_layer_scale, quant_scheme)
+    study_name = "OPTUNA_SEARCH_ADAPTIVE_{}_{}_FIRST{}_{}SHOTS_MAXSCALE{}_SCHEME{}".format(
+        model.replace("/", "_"), task_suffix, limit, num_fewshots, max_per_layer_scale, quant_scheme)
     storage_name = "sqlite:///{}.db".format(study_name)
     sampler = optuna.samplers.NSGAIISampler(constraints_func=constraints)
     study = optuna.create_study(directions=["maximize", "minimize"], study_name=study_name, storage=storage_name, sampler=sampler)
     
-    print(args)
-    print('Preparing layer grouping config...')
+    print("Configuration:")
+    print(f"  Model: {model}")
+    print(f"  Evaluation mode: {evaluation_mode}")
+    print(f"  Tasks: {evaluation_tasks if evaluation_tasks else args.custom_dataset_path}")
+    print(f"  Max scale: {max_per_layer_scale}")
+    print(f"  Trials: {args.n_trials}")
+    print(f"  Samples per trial: {limit}")
+    
+    print('\nPreparing layer grouping config...')
     prepare_layer_grouping_config(model, quant_scheme)
     print('Layer grouping: ', current_layer_grouping)
     print('Special layers: ', current_special_layers)
     print('Grouping quant template: ', current_grouping_quant_template)
     print('Total layers: ', current_tot_layers)
+    
+    # Store evaluation config in global variables for use in objective function
+    global global_evaluation_mode, global_evaluation_tasks, global_custom_dataset_path
+    global_evaluation_mode = evaluation_mode
+    global_evaluation_tasks = evaluation_tasks
+    global_custom_dataset_path = args.custom_dataset_path
     
     study.optimize(objective, n_trials=args.n_trials)
