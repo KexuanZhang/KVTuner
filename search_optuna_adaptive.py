@@ -284,22 +284,48 @@ def parse_quant_config(quant_config: str):
     return {'nbits_key': precision_key, 'nbits_value': precision_value}
 
 def prepare_layer_grouping_config(model_name: str, quant_scheme: str):
-    model_name = model_name.split('/')[-1]
-    model_name = model_name.replace('-AWQ', '') # Qwen2.5-3B-Instruct-AWQ -> Qwen2.5-3B-Instruct
+    # Better model detection - check for model names in path
+    if 'Qwen2.5-3B-Instruct' in model_name:
+        model_key = 'Qwen2.5-3B-Instruct'
+    elif 'Qwen2.5-7B-Instruct' in model_name:
+        model_key = 'Qwen2.5-7B-Instruct'
+    elif 'Qwen2.5-14B-Instruct' in model_name:
+        model_key = 'Qwen2.5-14B-Instruct'
+    elif 'Qwen2.5-32B-Instruct' in model_name:
+        model_key = 'Qwen2.5-32B-Instruct'
+    elif 'Meta-Llama-3.1-8B-Instruct' in model_name:
+        model_key = 'Meta-Llama-3.1-8B-Instruct'
+    elif 'Mistral-7B-Instruct' in model_name:
+        model_key = 'Mistral-7B-Instruct-v0.3'
+    else:
+        # Fallback to filename extraction
+        model_key = model_name.split('/')[-1].replace('-AWQ', '')
+    
+    print(f"Model path: {model_name}")
+    print(f"Detected model key: {model_key}")
+    
+    if model_key not in LAYER_GROUPING_CONFIG:
+        raise ValueError(f"Model {model_key} not found in LAYER_GROUPING_CONFIG. Available models: {list(LAYER_GROUPING_CONFIG.keys())}")
+    
     global current_layer_grouping, current_special_layers, current_grouping_quant_template, current_tot_layers
-    current_layer_grouping = LAYER_GROUPING_CONFIG[model_name][quant_scheme]
-    current_special_layers = SPECIAL_LAYERS[model_name][quant_scheme]
-    current_tot_layers = TOT_LAYER[model_name]
+    current_layer_grouping = LAYER_GROUPING_CONFIG[model_key][quant_scheme]
+    current_special_layers = SPECIAL_LAYERS[model_key][quant_scheme]
+    current_tot_layers = TOT_LAYER[model_key]
+    
+    # Reset grouping template
+    current_grouping_quant_template = []
+    
     # check if current_special_layers breaks the current_layer_grouping
     for group in current_layer_grouping:
-        group_quant_template = STANDARD_KV_QUANT_CONFIG
+        group_quant_template = STANDARD_KV_QUANT_CONFIG.copy()
         for layer in group:
             for special_layer in current_special_layers.keys():
                 if layer in special_layer:
                     group_quant_template = current_special_layers[special_layer]
                     for other_layer in group:
                         if not other_layer in special_layer:
-                            raise ValueError("Special layer {} breaks the layer grouping for model {}, quant scheme {}".format(special_layer, model_name, quant_scheme))
+                            raise ValueError("Special layer {} breaks the layer grouping for model {}, quant scheme {}".format(special_layer, model_key, quant_scheme))
+                    break
         if debug_constraint:
             group_quant_template = [i for i in group_quant_template if i != 'KV2'] # remove KV2
         current_grouping_quant_template.append(group_quant_template)
@@ -505,12 +531,23 @@ if __name__ == "__main__":
         evaluation_mode = "single_task"
         print(f"Using single task: {args.evaluation_task}")
     
-    # Setup local model if needed
-    if args.local_model_layers or (not model.startswith(('meta-llama', 'Qwen', 'mistralai'))):
+    # Setup local model if needed - only for truly unknown models
+    model_needs_local_setup = (
+        args.local_model_layers or 
+        (not any(known_model in model for known_model in [
+            'Meta-Llama-3.1-8B-Instruct', 'Mistral-7B-Instruct', 
+            'Qwen2.5-3B-Instruct', 'Qwen2.5-7B-Instruct', 
+            'Qwen2.5-14B-Instruct', 'Qwen2.5-32B-Instruct'
+        ]))
+    )
+    
+    if model_needs_local_setup:
         print("Setting up local model configuration...")
         model_key = setup_local_model_config(model, args.local_model_layers)
         if model_key is None:
             sys.exit(1)
+    else:
+        print(f"Using predefined configuration for model: {model}")
     
     # Create study name based on evaluation mode
     task_suffix = ""

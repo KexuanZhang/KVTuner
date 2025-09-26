@@ -122,9 +122,21 @@ def get_layer_grouping_config(model_name: str, quant_scheme: str):
 
     STANDARD_KV_QUANT_CONFIG = ['KV8', 'K8V4', 'KV4', 'K4V2', 'KV2']
 
-    # Handle local models by detecting from study name
-    if model_name == 'local-model' or model_name not in LAYER_GROUPING_CONFIG:
-        # Try to detect number of layers from common model sizes
+    # Model detection - match the search script logic exactly
+    if 'Qwen2.5-3B-Instruct' in model_name:
+        model_key = 'Qwen2.5-3B-Instruct'
+    elif 'Qwen2.5-7B-Instruct' in model_name:
+        model_key = 'Qwen2.5-7B-Instruct'
+    elif 'Qwen2.5-14B-Instruct' in model_name:
+        model_key = 'Qwen2.5-14B-Instruct'
+    elif 'Qwen2.5-32B-Instruct' in model_name:
+        model_key = 'Qwen2.5-32B-Instruct'
+    elif 'Meta-Llama-3.1-8B-Instruct' in model_name:
+        model_key = 'Meta-Llama-3.1-8B-Instruct'
+    elif 'Mistral-7B-Instruct' in model_name:
+        model_key = 'Mistral-7B-Instruct-v0.3'
+    elif model_name == 'local-model' or model_name not in LAYER_GROUPING_CONFIG:
+        # Handle truly local/unknown models
         if 'local-model' not in TOT_LAYER:
             # Default to 36 layers for local Qwen2.5-3B-Instruct
             num_layers = 36
@@ -146,10 +158,12 @@ def get_layer_grouping_config(model_name: str, quant_scheme: str):
                     (0, num_layers-1): ['KV8', 'K4V8', 'KV4', 'K4V2'],
                 },
             }
-        
         model_key = 'local-model'
     else:
-        model_key = model_name
+        model_key = model_name.split('/')[-1].replace('-AWQ', '')
+    
+    print(f"Model name: {model_name}")
+    print(f"Detected model key: {model_key}")
 
     layer_grouping = LAYER_GROUPING_CONFIG[model_key][quant_scheme]
     special_layers = SPECIAL_LAYERS[model_key][quant_scheme]
